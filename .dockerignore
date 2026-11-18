@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+playwright-report
+test-results
+data
+backups
+*.sqlite
+*.sqlite-*
+Statement Samples
+.env
+.env.*

@@ -1,0 +1,60 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { healthResponseSchema, type ApiError } from '@funance/shared';
+import { Hono, type Context } from 'hono';
+
+export type AppOptions = {
+  version: string;
+  /** Directory holding the built web app; when absent, only the API is served. */
+  staticDir?: string;
+};
+
+function apiError(c: Context, status: 404 | 500, code: string, message: string) {
+  return c.json<ApiError>({ error: { code, message } }, status);
+}
+
+/** Builds the Hono app. Tests call `app.request()` on it without opening a port. */
+export function createApp(options: AppOptions): Hono {
+  const app = new Hono();
+  const api = new Hono();
+
+  // API routes: append one line per resource.
+  api.get('/health', (c) =>
+    c.json(healthResponseSchema.parse({ status: 'ok', version: options.version })),
+  );
+
+  app.route('/api', api);
+
+  // Built web assets. API routes are matched first; a miss falls through to notFound below.
+  const { staticDir } = options;
+  if (staticDir !== undefined) {
+    app.use('*', serveStatic({ root: staticDir }));
+  }
+
+  app.notFound((c) => {
+    const { path, method } = c.req;
+    if (path === '/api' || path.startsWith('/api/')) {
+      return apiError(c, 404, 'not_found', `No route for ${method} ${path}`);
+    }
+    // SPA fallback: unknown page paths get index.html; unknown files stay 404.
+    const lastSegment = path.split('/').pop() ?? '';
+    const indexPath = staticDir === undefined ? undefined : join(staticDir, 'index.html');
+    if (
+      (method === 'GET' || method === 'HEAD') &&
+      !lastSegment.includes('.') &&
+      indexPath !== undefined &&
+      existsSync(indexPath)
+    ) {
+      return c.html(readFileSync(indexPath, 'utf8'));
+    }
+    return c.text('Not found', 404);
+  });
+
+  app.onError((err, c) => {
+    console.error(err);
+    return apiError(c, 500, 'internal', 'Internal server error');
+  });
+
+  return app;
+}

@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    image: funance:latest
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    environment:
+      PORT: '8080'
+      DATABASE_PATH: /data/finance.sqlite
+    volumes:
+      # Live database: a named volume, because SQLite locking is unreliable on
+      # Docker Desktop's shared host folders (PLAN.md section 4).
+      - finance_data:/data
+      # Finished backup snapshots only (written from M10 on).
+      - ./backups:/backups
+
+volumes:
+  finance_data:
+    name: finance_data
