@@ -7,16 +7,22 @@
     "dev": "tsx watch src/index.ts",
     "build": "node build.mjs",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "seed:demo": "tsx src/db/demo-seed-cli.ts"
   },
   "dependencies": {
+    "@funance/core": "workspace:*",
     "@funance/shared": "workspace:*",
     "@hono/node-server": "^2.1.8",
     "better-sqlite3": "^13.2.0",
-    "hono": "^4.13.19"
+    "drizzle-orm": "0.45.4",
+    "hono": "^4.13.19",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "drizzle-kit": "0.31.11",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   }
