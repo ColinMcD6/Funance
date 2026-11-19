@@ -24,12 +24,19 @@ export default defineConfig({
           include: ['src/**/*.test.ts'],
         },
       },
+      {
+        test: {
+          name: 'fixtures',
+          root: './fixtures',
+          include: ['**/*.test.ts'],
+        },
+      },
       // The web project reuses apps/web/vite.config.ts for its alias and plugins.
       './apps/web/vitest.config.ts',
     ],
     coverage: {
       provider: 'v8',
-      include: ['packages/*/src/**', 'apps/*/src/**'],
+      include: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
       exclude: ['**/*.test.{ts,tsx}', '**/index.ts', 'apps/web/src/main.tsx'],
       reporter: ['text-summary', 'html'],
       thresholds: {
