@@ -50,4 +50,4 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 ### Follow-ups
 
 - M1 adds the Drizzle schema, migrations, and seed on top of `src/db/connection.ts`.
-- The GitHub Actions workflow has not run yet; check it on the first pull request.
+- The GitHub Actions workflow passed on its first run (PR #1, 5m31s).
