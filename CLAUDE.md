@@ -12,10 +12,12 @@ pnpm install        install
 pnpm dev            server on 8080, web on 5173 with /api proxy
 pnpm check          format, lint, typecheck, tests, build (run often)
 pnpm check:all      check plus Playwright (must pass before you finish)
-pnpm seed:demo      fill a dev database with synthetic data (added in M1)
+pnpm seed:demo      fill a dev database with synthetic data (refuses one with transactions)
 ```
 
-Also useful: `pnpm format` (write Prettier fixes), `pnpm e2e` (Playwright only; needs
+Also useful: `pnpm format` (write Prettier fixes), `pnpm fixtures:generate` (rewrite
+fixtures/csv from fixtures/generate.ts), `pnpm --filter @funance/server db:generate` (write a
+migration after a db/schema.ts change), `pnpm e2e` (Playwright only; needs
 `pnpm build` first), `E2E_BASE_URL=http://localhost:8080 pnpm e2e` (run the specs
 against an already running app, such as the Docker container).
 

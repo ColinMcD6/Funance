@@ -3,11 +3,12 @@
 Milestone log. Every session appends an entry: what was built, deviations, follow-ups.
 Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISIONS.md).
 
-| Milestone                            | State       |
-| ------------------------------------ | ----------- |
-| M0 Scaffold and tooling              | Done        |
-| M1 Contracts, schema, seed, fixtures | Next        |
-| M2 to M10, ML                        | Not started |
+| Milestone                            | State             |
+| ------------------------------------ | ----------------- |
+| M0 Scaffold and tooling              | Done              |
+| M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
+| M2, M3, M5 (parallel after H1)       | Next              |
+| M4, M6 to M10, ML                    | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -51,3 +52,58 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 
 - M1 adds the Drizzle schema, migrations, and seed on top of `src/db/connection.ts`.
 - The GitHub Actions workflow passed on its first run (PR #1, 5m31s).
+
+## M1: Contracts, schema, seed, fixtures (2026-11-18, branch `m1-contracts`)
+
+### Built
+
+- `packages/shared`: Zod schemas and types for all seven entities (`entities.ts`), `CsvMapping`
+  and the preset ids (`csv-mapping.ts`), shared primitives (`primitives.ts`: ids, cents,
+  calendar-checked `YYYY-MM-DD` dates, months, timestamps), and a request and response schema
+  for every route in PLAN.md section 2 (`api.ts`), including the legacy import and budgets.
+- `apps/server/src/db/schema.ts`: Drizzle schema for the seven tables with every PLAN.md index,
+  CHECK constraints on enum columns, and foreign keys. First migration
+  `migrations/0000_init.sql` generated with drizzle-kit.
+- Server start (`db/init.ts`) opens the file, applies pending migrations and seeds an empty
+  database: owners Colin, Emily, Joint; the 26 sheet categories in 14 major categories plus Card
+  Payment and Transfer (`transfer`); the five accounts with preset mappings and default owners
+  (Walmart with an empty `ownerHintMap`); the three card-payment rules. The server build copies
+  the migrations to `dist/migrations`.
+- `packages/core/src/csv/presets.ts`: the five presets from PLAN.md, needed by the seed.
+- `pnpm seed:demo` (`db/demo-seed.ts`): 14 months (2025-09 to 2026-10) across the 5 accounts,
+  70 imports and 637 transactions, 80% categorized, card payments set by the seeded rules, and
+  every category kind represented. Seeded PRNG and fixed clock.
+- `fixtures/generate.ts` (seeded) and its output in `fixtures/csv`: the eight files of PLAN.md
+  section 6 with the exact headers, the example rows, the row counts and every "must contain"
+  item. `pnpm fixtures:generate` rewrites them.
+- `apps/web/src/api`: `http.ts` (fetch wrapper, error mapping, response validation in
+  development) and `client.ts` (one typed function per route).
+
+### Acceptance
+
+- Drizzle columns match the Zod entity schemas: `apps/server/src/db/schema.test.ts` (field names,
+  nullability, snake_case column names, and a compile-time equality of the row types).
+- Empty path is created and seeded, and a second start changes nothing:
+  `apps/server/src/db/init.test.ts`. Also checked by hand against the built server.
+- `pnpm seed:demo` is deterministic: `apps/server/src/db/demo-seed.test.ts` (identical counts,
+  totals and full table contents across two runs).
+- Fixtures match the PLAN.md header rows byte for byte: `fixtures/fixtures.test.ts` (also checks
+  the files equal the generator's output, the example rows, row counts and contents).
+- `pnpm check:all` passes: 132 Vitest tests, 4 Playwright tests.
+
+### Deviations
+
+- Presets were written in M1 rather than M2, because the seed needs them. M2 owns the file.
+- The demo seed computes `merchant_key` by hand (M2 writes `merchantKey`); its `dedup_key`
+  follows the PLAN.md formula.
+- The contract fills in details PLAN.md left open (list shapes, preview and commit shapes,
+  `categorySource` on a patch, report row shapes). All are listed in DECISIONS.md under M1.
+- Coverage now counts only `.ts`/`.tsx` files, so the SQL migration is not parsed as code.
+
+### Follow-ups
+
+- H1: read the seeded categories and owners (`apps/server/src/db/seed-data.ts`) and compare each
+  fixture header with the real file's header, including line endings (fixtures use LF).
+- No `GET /session` route is in the plan; M3 may need one to learn the active profile if the
+  cookie is HTTP-only. That would be a contract change.
+- M2 should produce golden files in `fixtures/expected` from these fixtures.

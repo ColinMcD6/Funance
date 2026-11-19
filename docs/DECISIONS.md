@@ -51,3 +51,71 @@ Dated contract changes, deviations from [PLAN.md](PLAN.md), and new dependencies
   server on a fresh database in the OS temp folder. `E2E_BASE_URL` points the same specs at an
   already running app (used to check the Docker container; M10 needs this).
 - **Coverage threshold** of 90% lines on `packages/core/src` is enforced from M0.
+
+## 2026-11-18 · M1
+
+M1 defines the contracts, so none of the below is a change to a frozen contract; they are the
+choices made where PLAN.md section 2 left room, recorded so later milestones build on them.
+
+### Dependencies
+
+| Package                       | Where      | Why                                                                              |
+| ----------------------------- | ---------- | -------------------------------------------------------------------------------- |
+| `drizzle-orm` 0.45.4          | server     | ORM in the PLAN.md stack table; latest stable (1.0 is still in beta/rc)          |
+| `drizzle-kit` 0.31.11         | server dev | Generates SQL migrations from `db/schema.ts` (`db:generate`)                     |
+| `zod`                         | server     | Already used by shared; the server imports schema types directly (contract test) |
+| `tsx`                         | root dev   | Runs `fixtures/generate.ts` (`pnpm fixtures:generate`)                           |
+| `@funance/core` (workspace)   | server     | The seed copies each account's mapping from the core presets                     |
+| `@funance/shared` (workspace) | core       | Core functions are typed with the shared `CsvMapping` and `CsvPreset`            |
+
+### Contract details chosen in M1
+
+- **Shared layout.** `packages/shared/src/primitives.ts` (ids, cents, dates, months, timestamps),
+  `csv-mapping.ts`, `entities.ts` (one schema per table, plus the enum value tuples such as
+  `CATEGORY_KINDS` that the Drizzle schema reuses), `api.ts` (every request and response).
+- **Lists are plain JSON arrays** (`GET /owners`, `/accounts`, `/categories`, ...). Only
+  `GET /transactions` is paginated as `{ items, total }`, as PLAN.md says.
+- **Imports in API responses omit `rawCsv`** (`importSummarySchema`). `GET /imports/:id` returns
+  `{ import, manuallyCategorizedCount }` so the undo confirmation can state the count.
+- **Preview response** carries `sameFileImportIds` (the identical-file warning) and
+  `legacyOverlapMonths` (ML's informational note). Each `previewRow` has the parsed fields, the
+  owner and rule category it would get, `reason` for skipped and error rows, and `raw`.
+- **Commit body** is `{ skipLines?: number[] }`, ML's untick-a-row feature, defined now so ML
+  needs no contract change. An empty body commits every `new` row.
+- **Legacy preview** extends the CSV preview with `monthTotals` (`sheetTotalCents`, the sheet's
+  raw sum with spending positive) and structured `violations` (sheet, row, column, rule).
+- **Transaction patch** accepts an optional `categorySource` of `manual` (default) or `suggestion`,
+  which M7 needs to record an accepted suggestion. `rule` cannot be set by a client.
+- **`excluded` query filter** is `true` or `false`; omitted means both.
+- **Reports.** Monthly rows carry `categoryId` and `groupName`; both null is the uncategorized
+  bucket, and `categoryId` is always null with `groupBy=group`. Compare rows are in each kind's
+  own direction (spending, income or saved, positive when normal); a comparison month with no data
+  is null. The trailing average covers the 3 months before the month, rounded to whole cents.
+- **Other response shapes:** `POST/DELETE /session` return `{ owner | null }`; `DELETE /rules/:id`
+  returns `{ deletedId }`; bulk patch and `rules/apply` return `{ changed }`; `PUT /budgets`
+  replaces all rows; `POST /backup` returns `{ filename, createdAt, sizeBytes }`.
+- **`rawRow`** is a JSON object keyed by header, or an array for headerless files.
+- **`rawCsv`** of a legacy import is an empty string (the workbook is binary).
+
+### Schema details
+
+- Enum columns have CHECK constraints; `imports` has a CHECK that a csv import has an account
+  and a legacy import has none.
+- Extra indexes beyond PLAN.md's list, all for lookups later milestones make:
+  `imports(account_id)`, `imports(file_sha256)` (identical-file warning), `rules(priority)`,
+  `transactions(import_id)` (undo), `budgets(category_id, effective_from)`.
+- `transactions.rule_id` is `ON DELETE SET NULL`, so deleting a rule keeps the categories it set.
+- Migrations live in `apps/server/src/db/migrations` (excluded from Prettier, as generated files)
+  and are copied to `dist/migrations` by the server build.
+
+### Other M1 choices
+
+- **Seeding runs only on a database with no owners**, so it runs once; edits made later in
+  Settings are never overwritten.
+- **Presets were written in M1** (`packages/core/src/csv/presets.ts`), because the seed copies
+  each account's mapping from them. M2 owns that file and may refine them under its golden tests.
+- **Demo data** covers September 2025 to October 2026 (14 months), uses a seeded PRNG and a fixed
+  clock, and refuses to run on a database that already has transactions. Its `dedup_key` follows
+  the PLAN.md formula; its `merchant_key` values are hand-written, not produced by M2's function.
+- **Fixture CSVs use LF line endings** and are marked `-text` in `.gitattributes` so git never
+  rewrites their bytes. Check real exports' line endings at H1.
