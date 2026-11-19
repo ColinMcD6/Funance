@@ -1,0 +1,23 @@
+{
+  "name": "@funance/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@funance/shared": "workspace:*",
+    "@hono/node-server": "^2.1.8",
+    "better-sqlite3": "^13.2.0",
+    "hono": "^4.13.19"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15"
+  }
+}
