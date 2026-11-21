@@ -1,0 +1,339 @@
+{
+  "fixture": "simplii-visa-2026-10.csv",
+  "preset": "simplii",
+  "ownerDefaults": {
+    "defaultOwnerId": 3
+  },
+  "rows": [
+    {
+      "line": 2,
+      "raw": {
+        "Date": "10/08/2026",
+        "Transaction Details": "SAFEWAY #1234, WINNIPEG MB",
+        "Funds Out": "65.29",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-08",
+      "postedDate": null,
+      "amountCents": -6529,
+      "description": "SAFEWAY #1234, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "SAFEWAY WINNIPEG MB",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "eaff2fdb667708562357512f57fc347e10c50573d2ff253c465898610c64c174",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 3,
+      "raw": {
+        "Date": "10/09/2026",
+        "Transaction Details": "SHOPPERS DRUG MART #0421 WINNIPEG",
+        "Funds Out": "20.11",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-09",
+      "postedDate": null,
+      "amountCents": -2011,
+      "description": "SHOPPERS DRUG MART #0421 WINNIPEG",
+      "memo": null,
+      "merchantKey": "SHOPPERS DRUG MART",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "9c91cd0646ac696ddf38fb82e93565551651c0bdb0f9e505f7120d13d32300fa",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 4,
+      "raw": {
+        "Date": "10/09/2026",
+        "Transaction Details": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+        "Funds Out": "121.27",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-09",
+      "postedDate": null,
+      "amountCents": -12127,
+      "description": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "LITTLE SPROUTS BABY",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "98a5c5fcbba42f19058eabf67f56c3c18194048b884440549398bbd9157b907f",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 5,
+      "raw": {
+        "Date": "10/10/2026",
+        "Transaction Details": "HOME DEPOT #7051, WINNIPEG MB",
+        "Funds Out": "133.40",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-10",
+      "postedDate": null,
+      "amountCents": -13340,
+      "description": "HOME DEPOT #7051, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "HOME DEPOT WINNIPEG",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "aeeadcb7ccd3ee6a377934ca68757c56e989fc7f4b152a08519e204fee3f3db4",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 6,
+      "raw": {
+        "Date": "10/12/2026",
+        "Transaction Details": "SHOPPERS DRUG MART #0421 WINNIPEG",
+        "Funds Out": "13.54",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-12",
+      "postedDate": null,
+      "amountCents": -1354,
+      "description": "SHOPPERS DRUG MART #0421 WINNIPEG",
+      "memo": null,
+      "merchantKey": "SHOPPERS DRUG MART",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "3dcb30a2971ad4828c735b5047255d457456a05a392c82c7209169b788437aeb",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 7,
+      "raw": {
+        "Date": "10/16/2026",
+        "Transaction Details": "PAWS AND CLAWS, PET SUPPLY",
+        "Funds Out": "54.00",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-16",
+      "postedDate": null,
+      "amountCents": -5400,
+      "description": "PAWS AND CLAWS, PET SUPPLY",
+      "memo": null,
+      "merchantKey": "PAWS AND CLAWS",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "ea7d728e204310452a00797fca1908a039f4063119d2b9f982ebfe85504ec071",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 8,
+      "raw": {
+        "Date": "10/18/2026",
+        "Transaction Details": "HOME DEPOT #7051, WINNIPEG MB",
+        "Funds Out": "6.86",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-18",
+      "postedDate": null,
+      "amountCents": -686,
+      "description": "HOME DEPOT #7051, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "HOME DEPOT WINNIPEG",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "e19149a52456bec9157cbfca6365575216f88b2ed825a236a904ecfc11e6071a",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 9,
+      "raw": {
+        "Date": "10/19/2026",
+        "Transaction Details": "AMZN Mktp CA*AB1CD2EF3 866-216-1072, ON",
+        "Funds Out": "45.99",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-19",
+      "postedDate": null,
+      "amountCents": -4599,
+      "description": "AMZN Mktp CA*AB1CD2EF3 866-216-1072, ON",
+      "memo": null,
+      "merchantKey": "AMZN MKTP CA",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "a93516aa75bd2bb5ac1ef11dda2ea24b3967dd1f67790dbcdc1704528e8334a9",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 10,
+      "raw": {
+        "Date": "10/23/2026",
+        "Transaction Details": "PAYMENT THANK YOU/PAIEMEN T MERCI",
+        "Funds Out": "",
+        "Funds In": "400.00",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-23",
+      "postedDate": null,
+      "amountCents": 40000,
+      "description": "PAYMENT THANK YOU/PAIEMEN T MERCI",
+      "memo": null,
+      "merchantKey": "PAYMENT THANK YOU/PAIEMEN",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "33e45814409de139c2305d79f5a721979608b1bb226207696fb2857168ee78cd",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 11,
+      "raw": {
+        "Date": "10/23/2026",
+        "Transaction Details": "SAFEWAY #1234, WINNIPEG MB",
+        "Funds Out": "84.30",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-23",
+      "postedDate": null,
+      "amountCents": -8430,
+      "description": "SAFEWAY #1234, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "SAFEWAY WINNIPEG MB",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "a78ba65c76b3c9790968ccf23d85acd372223eb54fea15109cb4a9bec2e4bc76",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 12,
+      "raw": {
+        "Date": "10/24/2026",
+        "Transaction Details": "SAFEWAY #1234, WINNIPEG MB",
+        "Funds Out": "13.00",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-24",
+      "postedDate": null,
+      "amountCents": -1300,
+      "description": "SAFEWAY #1234, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "SAFEWAY WINNIPEG MB",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "564e0160529d425f3d7ad5d398b1c5d935fadb9de468ce767ed19fbdfdba05bf",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 13,
+      "raw": {
+        "Date": "10/24/2026",
+        "Transaction Details": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+        "Funds Out": "58.97",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-24",
+      "postedDate": null,
+      "amountCents": -5897,
+      "description": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "LITTLE SPROUTS BABY",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "b03c68844e039072ab429b0aea62a43c7b43afa922829d2c655f6cfd969f8fe7",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 14,
+      "raw": {
+        "Date": "10/25/2026",
+        "Transaction Details": "PAWS AND CLAWS, PET SUPPLY",
+        "Funds Out": "24.87",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-25",
+      "postedDate": null,
+      "amountCents": -2487,
+      "description": "PAWS AND CLAWS, PET SUPPLY",
+      "memo": null,
+      "merchantKey": "PAWS AND CLAWS",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "0ac86c8884a09e2050db430ff0c6a17a00bda5d81425010608f063fdee2cdc17",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 15,
+      "raw": {
+        "Date": "10/25/2026",
+        "Transaction Details": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+        "Funds Out": "69.25",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-25",
+      "postedDate": null,
+      "amountCents": -6925,
+      "description": "LITTLE SPROUTS BABY SHOP WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "LITTLE SPROUTS BABY",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "1cd2c8f2bf097c6daf71fd16c89f6b9660bbe1ea3010b2e5daa3806bdac4eac2",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 16,
+      "raw": {
+        "Date": "10/28/2026",
+        "Transaction Details": "SAFEWAY #1234, WINNIPEG MB",
+        "Funds Out": "71.09",
+        "Funds In": "",
+        "Credit Card": "4500********0000"
+      },
+      "status": "parsed",
+      "date": "2026-10-28",
+      "postedDate": null,
+      "amountCents": -7109,
+      "description": "SAFEWAY #1234, WINNIPEG MB",
+      "memo": null,
+      "merchantKey": "SAFEWAY WINNIPEG MB",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "22703e3fa2f4770f144f3cb5df0c29fc1db7cf87ba0936ef131946c337af1133",
+      "ownerHint": null,
+      "ownerId": 3
+    }
+  ]
+}
