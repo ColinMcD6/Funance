@@ -2,3 +2,5 @@
 *.cmd text eol=crlf
 *.xlsx binary
 *.sqlite binary
+# Fixture statements are compared byte for byte: never convert line endings.
+fixtures/csv/*.csv -text

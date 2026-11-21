@@ -2,10 +2,12 @@ import { serve } from '@hono/node-server';
 import packageJson from '../package.json' with { type: 'json' };
 import { createApp } from './app.js';
 import { readConfig } from './config.js';
-import { openDatabase } from './db/connection.js';
+import { systemClock } from './clock.js';
+import { initDatabase } from './db/init.js';
 
 const config = readConfig();
-const db = openDatabase(config.databasePath);
+// Creates the file if needed, applies migrations, and seeds an empty database.
+const db = initDatabase(config.databasePath, systemClock);
 const app = createApp({ version: packageJson.version, staticDir: config.staticDir });
 
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
@@ -15,7 +17,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
 
 function shutdown(): void {
   server.close(() => {
-    db.close();
+    db.$client.close();
     process.exit(0);
   });
 }

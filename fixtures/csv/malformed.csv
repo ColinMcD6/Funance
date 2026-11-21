@@ -1,0 +1,9 @@
+Date,Transaction,Name,Memo,Amount
+10/01/2026,OTHER,Interac - Purchase - SOBEYS 4567,Interac - Purchase - SOBEYS 4567 WINNIPEG  MB  CA,-42.10
+13/45/2026,OTHER,Interac - Purchase - DOLLARAMA 11,Interac - Purchase - DOLLARAMA 1102 WINNIPEG  MB  CA,-10.00
+10/03/2026,OTHER,Interac - Purchase - SHELL C1234,Interac - Purchase - SHELL C12345 WINNIPEG  MB  CA,abc
+10/04/2026,OTHER,ABM Withdrawal
+
+10/06/2026,OTHER,Interac - Purchase - TIM HORTONS,Interac - Purchase - TIM HORTONS 0871 WINNIPEG  MB  CA,-4.35
+10/07/2026,OTHER,EFT Deposit from Northwind Mfg,EFT Deposit from Northwind Mfg,1850.00
+10/08/2026,OTHER,Interest Paid,Interest Paid,0.01
