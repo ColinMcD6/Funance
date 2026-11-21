@@ -1,12 +1,22 @@
-import type { CreateAccountRequest, UpdateAccountRequest } from '@funance/shared';
+import type {
+  CommitImportRequest,
+  CreateAccountRequest,
+  UpdateAccountRequest,
+} from '@funance/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  commitImport,
   createAccount,
+  getImport,
   getHealth,
   listAccounts,
+  listCategories,
   listCsvPresets,
+  listImports,
   listOwners,
+  previewImport,
   renameOwner,
+  undoImport,
   updateAccount,
 } from './client';
 
@@ -17,6 +27,9 @@ export const queryKeys = {
   owners: ['owners'],
   accounts: ['accounts'],
   csvPresets: ['csv-presets'],
+  categories: ['categories'],
+  imports: ['imports'],
+  importDetail: (id: number) => ['imports', id] as const,
 } as const;
 
 export function useHealth() {
@@ -57,5 +70,46 @@ export function useUpdateAccount() {
     mutationFn: ({ id, patch }: { id: number; patch: UpdateAccountRequest }) =>
       updateAccount(id, patch),
     onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.accounts }),
+  });
+}
+
+export function useCategories(options: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: queryKeys.categories, queryFn: listCategories, ...options });
+}
+
+export function useImports() {
+  return useQuery({ queryKey: queryKeys.imports, queryFn: listImports });
+}
+
+export function useImport(id: number, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.importDetail(id),
+    queryFn: () => getImport(id),
+    ...options,
+  });
+}
+
+export function usePreviewImport() {
+  return useMutation({
+    mutationFn: ({ accountId, file }: { accountId: number; file: File }) =>
+      previewImport(accountId, file, file.name),
+  });
+}
+
+/** Commit and undo change transactions, so every cached query (lists, reports, counts) refetches. */
+export function useCommitImport() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body?: CommitImportRequest }) =>
+      commitImport(id, body),
+    onSuccess: () => client.invalidateQueries(),
+  });
+}
+
+export function useUndoImport() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => undoImport(id),
+    onSuccess: () => client.invalidateQueries(),
   });
 }

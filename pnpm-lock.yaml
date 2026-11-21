@@ -257,6 +257,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@funance/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@funance/shared':
         specifier: workspace:*
         version: link:../../packages/shared
