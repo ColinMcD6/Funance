@@ -1,21 +1,29 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { healthResponseSchema, type ApiError } from '@funance/shared';
-import { Hono, type Context } from 'hono';
+import { healthResponseSchema } from '@funance/shared';
+import { Hono } from 'hono';
+import { systemClock, type Clock } from './clock.js';
+import type { Db } from './db/migrate.js';
+import { errorResponse, HttpError } from './http.js';
+import { accountRoutes } from './routes/accounts.js';
+import { csvPresetRoutes } from './routes/csv-presets.js';
+import { ownerRoutes } from './routes/owners.js';
+import { sessionRoutes } from './routes/session.js';
 
 export type AppOptions = {
   version: string;
+  /** The migrated, seeded database. */
+  db: Db;
+  /** Source of timestamps; tests inject a fixed clock. */
+  clock?: Clock;
   /** Directory holding the built web app; when absent, only the API is served. */
   staticDir?: string;
 };
 
-function apiError(c: Context, status: 404 | 500, code: string, message: string) {
-  return c.json<ApiError>({ error: { code, message } }, status);
-}
-
 /** Builds the Hono app. Tests call `app.request()` on it without opening a port. */
 export function createApp(options: AppOptions): Hono {
+  const { db, clock = systemClock } = options;
   const app = new Hono();
   const api = new Hono();
 
@@ -23,6 +31,10 @@ export function createApp(options: AppOptions): Hono {
   api.get('/health', (c) =>
     c.json(healthResponseSchema.parse({ status: 'ok', version: options.version })),
   );
+  api.route('/owners', ownerRoutes(db));
+  api.route('/session', sessionRoutes(db));
+  api.route('/accounts', accountRoutes(db, clock));
+  api.route('/csv-presets', csvPresetRoutes());
 
   app.route('/api', api);
 
@@ -35,7 +47,7 @@ export function createApp(options: AppOptions): Hono {
   app.notFound((c) => {
     const { path, method } = c.req;
     if (path === '/api' || path.startsWith('/api/')) {
-      return apiError(c, 404, 'not_found', `No route for ${method} ${path}`);
+      return errorResponse(c, 404, 'not_found', `No route for ${method} ${path}`);
     }
     // SPA fallback: unknown page paths get index.html; unknown files stay 404.
     const lastSegment = path.split('/').pop() ?? '';
@@ -52,8 +64,11 @@ export function createApp(options: AppOptions): Hono {
   });
 
   app.onError((err, c) => {
+    if (err instanceof HttpError) {
+      return errorResponse(c, err.status, err.code, err.message, err.details);
+    }
     console.error(err);
-    return apiError(c, 500, 'internal', 'Internal server error');
+    return errorResponse(c, 500, 'internal', 'Internal server error');
   });
 
   return app;

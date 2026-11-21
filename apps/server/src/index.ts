@@ -8,7 +8,7 @@ import { initDatabase } from './db/init.js';
 const config = readConfig();
 // Creates the file if needed, applies migrations, and seeds an empty database.
 const db = initDatabase(config.databasePath, systemClock);
-const app = createApp({ version: packageJson.version, staticDir: config.staticDir });
+const app = createApp({ version: packageJson.version, db, staticDir: config.staticDir });
 
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
   console.log(`Finance tracker listening on http://${config.host}:${info.port}`);

@@ -3,7 +3,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { apiErrorSchema, healthResponseSchema } from '@funance/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from './app.js';
+import { makeTempDir } from './db/test-db.js';
+import { makeTestApp } from './test-app.js';
+
+const temp = makeTempDir();
+const opened: (() => void)[] = [];
+afterAll(() => {
+  for (const close of opened) close();
+  temp.cleanup();
+});
+
+function createApp(options: { version: string; staticDir?: string }) {
+  const { app, close } = makeTestApp(temp.dir, options);
+  opened.push(close);
+  return app;
+}
 
 describe('GET /api/health', () => {
   it('returns ok with the version', async () => {
