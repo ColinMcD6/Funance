@@ -186,6 +186,23 @@ function mappedColumns(mapping: CsvMapping): string[] {
 }
 
 /**
+ * The columns `mapping` reads that the file does not have, in mapping order. For a file with a
+ * header these are header names; for a headerless file, 1-based column numbers beyond the first
+ * row's width. Empty when every column is present, or when the file has no readable first row
+ * (`parseCsv` reports that case on its rows).
+ */
+export function missingCsvColumns(content: Uint8Array, mapping: CsvMapping): string[] {
+  const first = readRecords(decodeCsvBytes(content, mapping.encoding))[0];
+  if (first === undefined || 'error' in first) return [];
+  const present = new Set(
+    mapping.hasHeader
+      ? first.fields.map((h) => h.trim())
+      : first.fields.map((_, i) => String(i + 1)),
+  );
+  return mappedColumns(mapping).filter((name) => !present.has(name));
+}
+
+/**
  * Reads a bank CSV export into one `ParsedRow` per data row (PLAN.md milestone M2). Never throws
  * on bad input: problems become `error` rows with a reason, and deliberately ignored rows become
  * `skipped` rows. Each row keeps its line number and the raw source row.

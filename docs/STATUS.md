@@ -9,8 +9,9 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
 | M2 CSV engine                        | Done              |
 | M3 App shell, profiles, accounts     | Done              |
-| M5 (parallel after H1)               | Next              |
-| M4, M6 to M10, ML                    | Not started       |
+| M4 Import flow                       | Done, awaiting H2 |
+| M5, ML (parallel)                    | Next              |
+| M6 to M10                            | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -229,3 +230,80 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 - M4: call `requireProfile` in `POST /imports/preview`; hide archived accounts from the import
   account picker.
 - M5 to M8: replace the placeholder entries in `routes.tsx` (one line each).
+
+## M4: Import flow (2026-11-20, branch `m4-import`)
+
+### Built
+
+- `apps/server/src/services/imports.ts` and `routes/imports.ts`:
+  - `POST /imports/preview` (multipart `file` + `accountId`, needs a profile): parses with the
+    account's mapping, compares with the account's transactions, stores an import in `preview`
+    with its counts, and returns every row with status, reason, owner and rule category, plus
+    the identical-file warning (`sameFileImportIds`) and `legacyOverlapMonths`.
+  - `POST /imports/:id/commit`: in one database transaction, re-reads the stored file, inserts
+    the rows still new at that moment (less `skipLines`), applies the rule engine, records the
+    final counts. 409 unless the import is a preview.
+  - `POST /imports/:id/undo`: deletes the import's transactions, marks it undone. 409 unless
+    committed.
+  - `GET /imports` (newest first) and `GET /imports/:id` (with `manuallyCategorizedCount`).
+  - `deleteStalePreviews` runs at server start and removes previews older than 24 hours.
+- `services/rule-engine.ts`: the `RuleEngine` interface and `noopRuleEngine`, the default of the
+  new `createApp` option `ruleEngine`.
+- `packages/core`: `missingCsvColumns(content, mapping)` for the clear 400; a `./money` subpath
+  export so the browser can import `formatCents` without the CSV engine.
+- Web (`apps/web/src/pages/import`): the Import page (active accounts only, file, preview with
+  counts, identical-file warning, status filter, table on desktop and cards on phones, Commit
+  and Cancel; a missing-columns error links to the account's mapping), the result screen
+  `/import/:id` linking to Uncategorized, and Import history `/import/history` with an inline
+  undo confirmation that states how many hand-categorized rows will be lost.
+
+### Acceptance
+
+- Preview then commit inserts the expected rows: `apps/server/src/routes/imports.test.ts`
+  ("inserts the new rows with their parsed fields and records the final counts").
+- A second preview of the same file shows all duplicates and the identical-file warning:
+  `imports.test.ts` ("a second preview of the same file shows every row as a duplicate and the
+  same-file warning").
+- The overlapping fixture inserts only the new rows (24 of 35): `imports.test.ts` ("inserts only
+  the new rows of an overlapping statement").
+- Undo removes exactly that import's rows: `imports.test.ts` ("removes exactly that import’s rows
+  and marks it undone").
+- Committing twice returns 409: `imports.test.ts` ("answers 409 when the import is already
+  committed...").
+- A file whose headers do not match the mapping returns 400 naming the missing columns:
+  `imports.test.ts` ("answers 400 naming the missing columns...") and
+  `packages/core/src/csv/parse-csv.test.ts` (`missingCsvColumns`); shown on the page with a link
+  to the mapping in `e2e/import.spec.ts` and `pages/import/import.test.tsx`.
+- Playwright: import a fixture, see the counts, commit, find the rows in the database through
+  the API, undo, and see them gone: `e2e/import.spec.ts` ("import a statement, commit, find its
+  rows, undo, and see them gone"), desktop and 390 px.
+- Also tested: previews older than 24 hours are deleted; commit decides duplicates at commit time;
+  unticked lines are skipped; occurrence gaps after an undo; latin1 files; the rule engine hook;
+  401, 404, 409 and validation errors; web component tests in `pages/import/import.test.tsx`.
+- `pnpm check:all` passes: 376 Vitest tests, 16 Playwright tests.
+
+### Deviations
+
+- No contract change.
+- "Find the rows in the database through the API": `GET /transactions` is M5's and not built
+  yet, so the e2e test previews the same file again through the API and expects every row to be
+  a duplicate (after commit) or new (after undo). M5 can add a `GET /transactions?account=`
+  check to `e2e/import.spec.ts`.
+- Commit does not take a backup yet; that is M10's backup service.
+- Commit uses the account's mapping at commit time, not at preview time. Details in
+  DECISIONS.md under M4.
+- Shared files touched beyond the milestone's area: `apps/server/src/app.ts` and
+  `apps/web/src/routes.tsx` (append-only lines), `apps/server/src/index.ts` (stale-preview
+  cleanup at start), `packages/core` (`missingCsvColumns`, the `./money` export),
+  `eslint.config.js` (forbids the core root import in web code).
+
+### Follow-ups
+
+- H2: on the real host, import one real statement per bank, check counts and five random rows,
+  re-import to confirm zero new.
+- M6: implement `RuleEngine` and pass it to `createApp` in `src/index.ts` (and `makeTestApp` if
+  tests need it); seeded card-payment rules then show in the preview.
+- ML: the preview's include checkboxes post `skipLines`, already supported by commit; show
+  `legacyOverlapMonths` as a note.
+- M10: take a backup after `commitImport`.
+- The web bundle is 540 kB (Vite warns above 500 kB); lazy routes can wait until M8.

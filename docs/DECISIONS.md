@@ -221,3 +221,62 @@ and matches it against `GET /owners`. The cookie holds only an owner id, which i
   and `apps/web/src/components/nav-items.ts`.
 - **The health badge** moved from the M0 home page to `components/server-status.tsx`, shown on
   the profile picker; its tests moved with it.
+
+## 2026-11-20 · M4
+
+No contract change: `packages/shared` and `db/schema.ts` are untouched.
+
+### Dependencies
+
+| Package                       | Where | Why                                                                                                                                                                                                                                             |
+| ----------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@funance/core` (workspace)   | web   | `formatCents` for amounts in the import preview, so money is formatted in one place                                                                                                                                                             |
+| `@funance/core/money` subpath | core  | New `exports` entry. The core root pulls in csv-parse, which uses Node's `Buffer` and crashed the browser bundle; the web app imports `@funance/core/money` only, and ESLint (`no-restricted-imports`) forbids the root import under `apps/web` |
+
+### How the import flow works
+
+- **A preview stores only the file.** `imports.raw_csv` holds the decoded text (BOM stripped),
+  and the counts are written at preview. Commit parses `raw_csv` again with the account's
+  current mapping (as UTF-8, since it is already decoded) and compares it with the account's
+  transactions as they are at that moment, inside one database transaction. A stale preview
+  therefore never inserts rows another import committed in the meantime; its final counts
+  can differ from the preview's. If the mapping is edited between preview and commit, the
+  commit uses the new mapping.
+- **Occurrence numbers fill gaps.** `assignOccurrences` (core) decides new or duplicate from the
+  per-key count m, as PLAN.md says. A new row then takes the lowest occurrence its key has
+  free: m+1, m+2, ... when there are no gaps, but after undoing an import whose rows were
+  occurrence 1 while a later import's occurrence 2 remains, a new row takes 1 instead of
+  colliding with the unique `(account_id, dedup_key, occurrence)` index.
+- **Missing columns are a 400**, code `missing_columns`, with `details.missingColumns`, checked
+  before parsing with the new core helper `missingCsvColumns`. No import row is created. A file
+  with no data rows is 400 `empty_file`. Files over 5 MB are 400 `file_too_large`.
+- **Other errors:** an unknown account is 404; an archived account is 409 `account_archived`;
+  commit of anything but a preview is 409 `not_a_preview`; undo of anything but a committed
+  import is 409 `not_committed`; preview without a profile is 401 `no_profile`.
+- **POST /imports/preview answers 201** (it creates an import). The commit body is optional: a
+  request without a `Content-Type` commits every new row.
+- **`skipLines`** is implemented now (ML builds the checkboxes): a listed line that is new at
+  commit time is not inserted and is counted as skipped; other listed lines are ignored.
+- **`sameFileImportIds`** lists committed imports with the same SHA-256, in any account.
+  **`legacyOverlapMonths`** is computed (months of the file's parsed dates that hold rows with no
+  account); ML adds the note to the page.
+- **Rule engine hook.** `services/rule-engine.ts` defines `RuleEngine`, called with the new rows
+  at preview (to show the category a rule would set) and at commit (rows get
+  `category_source = rule`, `rule_id`, and the rule's owner if it sets one). `createApp` takes
+  it as the `ruleEngine` option, defaulting to `noopRuleEngine`; M6 passes the real one.
+- **Stale previews** (status `preview`, `created_at` more than 24 hours before now) are deleted
+  by `deleteStalePreviews`, called from `src/index.ts` at start.
+- **No backup at commit yet.** PLAN.md section 3 says commit takes a backup; the backup service
+  is M10's task, which should call it after `commitImport`.
+- **`GET /imports` includes previews**; the history page hides them.
+
+### Web
+
+- Routes: `/import` (form, then preview), `/import/:id` (result), `/import/history`.
+- The preview is a table at 768 px and wider, and a list of cards below that.
+- Undo asks for confirmation inline (an `alertdialog` region in the row) rather than in a modal,
+  so no dialog component was added; it fetches `GET /imports/:id` for the manual count first.
+- Commit and undo invalidate every cached query, since they change transactions that lists,
+  reports and counts all read.
+- Category names in the preview come from `GET /categories` (M6), requested only when a row has a
+  rule category, so nothing calls that route until M6 lands.
