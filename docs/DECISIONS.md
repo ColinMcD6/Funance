@@ -166,3 +166,58 @@ choices made where PLAN.md section 2 left room, recorded so later milestones bui
 - **Golden files** live in `fixtures/expected/<fixture>.json`, checked by
   `fixtures/expected/csv-engine.test.ts`, which imports core by relative path (the repo root has no
   workspace dependency on it). Rewrite with `UPDATE_GOLDEN=1 pnpm vitest run --project fixtures`.
+
+## 2026-11-20 · M3
+
+No contract change: `packages/shared` and `db/schema.ts` are untouched.
+
+### Dependencies
+
+| Package                                          | Where   | Why                                                                                                                                                                                     |
+| ------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-router` 8                                 | web     | Routing, in the PLAN.md stack table                                                                                                                                                     |
+| `@tanstack/react-query` 5                        | web     | Server state, in the PLAN.md stack table (deferred from M0)                                                                                                                             |
+| `lucide-react`                                   | web     | Icons; the icon library shadcn/ui is configured with (`components.json`)                                                                                                                |
+| `@testing-library/user-event`                    | web dev | Realistic typing and selecting in component tests                                                                                                                                       |
+| shadcn/ui `button`, `input`, `label`, `checkbox` | web     | Added with the shadcn CLI. The CLI wrote `import { cn } from "cn"` and installed an unrelated npm package named `cn`; the imports were changed to `@/lib/utils` and the package removed |
+
+`@hono/zod-validator` (in the stack table) was **not** added: its default failure response is not
+the documented error shape. `apps/server/src/http.ts` has three small helpers (`parseJsonBody`,
+`parseParams`, `parseQuery`) that validate with the shared schemas and throw `HttpError`, which
+the app's error handler renders as `{ error: { code, message, details } }`.
+
+### How the web app learns the active profile
+
+PLAN.md has POST and DELETE `/session` but no GET. Rather than add a route (a contract change),
+the `profile` cookie is **not HttpOnly**: the web app reads it (`apps/web/src/api/session.ts`)
+and matches it against `GET /owners`. The cookie holds only an owner id, which is not a secret
+(there are no passwords), so script access exposes nothing. Attributes: `Path=/`,
+`SameSite=Lax`, `Max-Age` one year.
+
+### Other M3 choices
+
+- **Only `person` owners are profiles.** POST `/session` with the joint owner's id is 400
+  `not_a_profile`; an unknown id is 404. A cookie naming a missing or joint owner counts as no
+  profile, and the picker shows.
+- **`requireProfile(c, db)`** (`apps/server/src/profile.ts`) returns the active profile or
+  throws 401 `no_profile`, for routes that record who acted (M4's import preview). None of the M3
+  routes needs it, so owners, accounts and presets answer without a cookie.
+- **`createApp` now needs `db`** (and takes an optional `clock`). `src/test-app.ts`
+  `makeTestApp(dir)` gives each test its own migrated, seeded database with a fixed clock.
+- **Error codes:** `validation_error` and `invalid_json` (400), `invalid_reference` (400, an
+  unknown owner id in `defaultOwnerId` or `ownerHintMap`; `details` lists the ids), `not_found`
+  (404), `conflict` (409, a duplicate owner or account name), `no_profile` (401).
+- **POST `/accounts` answers 201.** `GET /accounts` lists archived accounts too, active first
+  then by name; archiving is PATCH `{ archived: true }`.
+- **Native `<select>`** (`components/native-select.tsx`) instead of the shadcn Select, for phone
+  pickers and simple keyboard and Playwright use.
+- **Account form.** The draft model (`pages/settings/account-draft.ts`) converts the form to a
+  `CreateAccountRequest`; empty optional fields are omitted, and a mapping with an owner-hint
+  column always gets an `ownerHintMap` (empty if no names), so every preset round-trips unchanged.
+  An empty `notEquals` or `matches` in a skip rule means "not set". Choosing a preset on an
+  existing account replaces its mapping, institution and type.
+- **Placeholders.** Pages of later milestones render a placeholder naming the milestone; their
+  routes and navigation entries already exist in the append-only lists `apps/web/src/routes.tsx`
+  and `apps/web/src/components/nav-items.ts`.
+- **The health badge** moved from the M0 home page to `components/server-status.tsx`, shown on
+  the profile picker; its tests moved with it.
