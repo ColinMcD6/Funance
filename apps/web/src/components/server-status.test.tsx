@@ -1,11 +1,15 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HomePage } from './home-page';
+import { afterEach, describe, expect, it } from 'vitest';
+import { vi } from 'vitest';
+import { mockApi } from '@/test-utils/mock-api';
+import { ServerStatus } from './server-status';
 
-function mockFetch(status: number, body: unknown) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+function renderStatus() {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ServerStatus />
+    </QueryClientProvider>,
   );
 }
 
@@ -14,24 +18,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('HomePage', () => {
+describe('ServerStatus', () => {
   it('shows ok and the version when the server is healthy', async () => {
-    mockFetch(200, { status: 'ok', version: '0.1.0' });
-    render(<HomePage />);
+    mockApi({ 'GET /api/health': () => ({ body: { status: 'ok', version: '0.1.0' } }) });
+    renderStatus();
     expect(await screen.findByText('ok')).toHaveAttribute('data-testid', 'health-status');
     expect(screen.getByText('v0.1.0')).toBeInTheDocument();
   });
 
   it('shows unreachable with the server message on an error', async () => {
-    mockFetch(500, { error: { code: 'internal', message: 'Internal server error' } });
-    render(<HomePage />);
+    mockApi({
+      'GET /api/health': () => ({
+        status: 500,
+        body: { error: { code: 'internal', message: 'Internal server error' } },
+      }),
+    });
+    renderStatus();
     expect(await screen.findByText('unreachable')).toBeInTheDocument();
     expect(screen.getByText('Internal server error')).toBeInTheDocument();
   });
 
   it('shows unreachable when the response does not match the schema', async () => {
-    mockFetch(200, { status: 'maybe' });
-    render(<HomePage />);
+    mockApi({ 'GET /api/health': () => ({ body: { status: 'maybe' } }) });
+    renderStatus();
     expect(await screen.findByText('unreachable')).toBeInTheDocument();
     expect(screen.getByText('Unexpected response from /health')).toBeInTheDocument();
   });

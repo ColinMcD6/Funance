@@ -8,7 +8,8 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M0 Scaffold and tooling              | Done              |
 | M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
 | M2 CSV engine                        | Done              |
-| M3, M5 (parallel after H1)           | Next              |
+| M3 App shell, profiles, accounts     | Done              |
+| M5 (parallel after H1)               | Next              |
 | M4, M6 to M10, ML                    | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
@@ -172,3 +173,59 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 - M7/H2: RBC descriptions start with a transaction type ("CONTACTLESS INTERAC PURCHASE TIM
   HORTONS"), so their merchant keys hold no merchant name. PLAN.md's prefix list has only
   Tangerine and card-processor prefixes; extend it once a real RBC export is seen.
+
+## M3: App shell, profiles, accounts (2026-11-20, branch `m3-app-shell`)
+
+### Built
+
+- Server routes, one file each in `apps/server/src/routes`, with SQL in `services/owners.ts` and
+  `services/accounts.ts`:
+  - `GET /owners`, `PATCH /owners/:id` (rename; 409 on a name another owner has).
+  - `POST /session` (sets the `profile` cookie for a person; joint is 400, unknown is 404),
+    `DELETE /session`.
+  - `GET /accounts`, `POST /accounts`, `PATCH /accounts/:id` (edit, archive, restore); owner ids
+    in `defaultOwnerId` and `ownerHintMap` are checked; duplicate names are 409.
+  - `GET /csv-presets` (the five presets from core).
+  - `http.ts` request validation helpers and `HttpError`; `profile.ts` `requireProfile` for M4.
+- Web (`apps/web/src`): React Router and TanStack Query (`api/queries.ts`).
+  - `ProfileGate` shows the profile picker until the cookie names a person; the header's
+    profile switcher changes profile or returns to the picker.
+  - `AppShell`: sidebar on desktop, fixed bottom bar with icons and short labels below 768 px.
+    Navigation and routes are the append-only lists `components/nav-items.ts` and `routes.tsx`;
+    pages of later milestones are placeholders.
+  - Settings: rename owners; list accounts with Edit and Archive/Restore; the account form
+    (new and edit) picks a preset, then shows every mapping field as editable, including the
+    owner-hint value map and the skip rules.
+
+### Acceptance
+
+- API tests cover each route's success and validation-failure cases:
+  `apps/server/src/routes/owners.test.ts`, `session.test.ts`, `accounts.test.ts`,
+  `csv-presets.test.ts`.
+- Playwright: choose a profile, create an account from the `walmart-mastercard` preset, map two
+  cardholder names to owners, reload, and see it persisted: `e2e/profiles-accounts.spec.ts`
+  ("create a Walmart account from the preset with two cardholders, and it persists"), on both the
+  desktop and 390 px projects.
+- The shell is usable at 390 px with no horizontal scrolling: `e2e/profiles-accounts.spec.ts`
+  ("the shell has no horizontal scrolling on any page", "every page is reachable from the
+  visible navigation"), phone project.
+- Component tests: `app.test.tsx` (gate, switcher, navigation), `pages/settings/settings.test.tsx`,
+  `pages/settings/account-draft.test.ts`, `components/server-status.test.tsx`,
+  `api/session.test.ts`.
+- `pnpm check:all` passes: 337 Vitest tests, 12 Playwright tests.
+
+### Deviations
+
+- No contract change. The web app reads the (non-HttpOnly) profile cookie instead of a
+  `GET /session` route; see DECISIONS.md under M3.
+- `@hono/zod-validator` was not added; small helpers in `http.ts` keep the documented error shape.
+- `createApp` now takes the database; `app.test.ts` builds its app through `makeTestApp`.
+- The M0 home page was removed; its health badge and tests moved to `components/server-status`.
+
+### Follow-ups
+
+- The web bundle is 526 kB (Vite warns above 500 kB). Splitting pages with lazy routes can wait
+  until the chart pages (M8) make it bigger.
+- M4: call `requireProfile` in `POST /imports/preview`; hide archived accounts from the import
+  account picker.
+- M5 to M8: replace the placeholder entries in `routes.tsx` (one line each).
