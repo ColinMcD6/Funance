@@ -169,7 +169,11 @@ describe('Import page', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Commit 2 new transactions' }));
-    expect(calls).toContainEqual({ method: 'POST', path: '/api/imports/7/commit', body: {} });
+    expect(calls).toContainEqual({
+      method: 'POST',
+      path: '/api/imports/7/commit',
+      body: { skipLines: [] },
+    });
     expect(
       await screen.findByRole('heading', { name: 'Imported 2 transactions' }),
     ).toBeInTheDocument();
@@ -177,6 +181,63 @@ describe('Import page', () => {
       'href',
       '/uncategorized',
     );
+  });
+
+  it('leaves out unticked rows: the commit posts their lines as skipLines', async () => {
+    const committed = summary({ status: 'committed', committedAt: '2026-11-20T12:00:00.000Z' });
+    const calls = api({
+      'POST /api/imports/preview': () => ({ status: 201, body: PREVIEW }),
+      'POST /api/imports/7/commit': () => ({ body: committed }),
+      'GET /api/imports/7': () => ({ body: { import: committed, manuallyCategorizedCount: 0 } }),
+    });
+    const user = userEvent.setup();
+    renderAt('/import');
+    await chooseFile(user);
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByRole('heading', { name: 'Preview: september.csv' });
+
+    // Only new rows have a checkbox (one in the table, one in the phone card list), ticked.
+    const boxes = screen.getAllByRole('checkbox', { name: 'Include line 3' });
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0]).toBeChecked();
+    expect(screen.queryAllByRole('checkbox', { name: 'Include line 4' })).toHaveLength(0);
+
+    const first = boxes[0];
+    if (first === undefined) throw new Error('no checkbox');
+    await user.click(first);
+    expect(screen.getAllByRole('checkbox', { name: 'Include line 3' })[1]).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Commit 1 new transaction' }));
+    expect(calls).toContainEqual({
+      method: 'POST',
+      path: '/api/imports/7/commit',
+      body: { skipLines: [3] },
+    });
+  });
+
+  it('notes months that already hold legacy rows', async () => {
+    api({
+      'POST /api/imports/preview': () => ({
+        status: 201,
+        body: { ...PREVIEW, legacyOverlapMonths: ['2026-08', '2026-09'] },
+      }),
+    });
+    const user = userEvent.setup();
+    renderAt('/import');
+    await chooseFile(user);
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      'The legacy spreadsheet already has transactions in 2026-08, 2026-09',
+    );
+  });
+
+  it('shows no legacy note when no month overlaps', async () => {
+    api({ 'POST /api/imports/preview': () => ({ status: 201, body: PREVIEW }) });
+    const user = userEvent.setup();
+    renderAt('/import');
+    await chooseFile(user);
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByRole('heading', { name: 'Preview: september.csv' });
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('cancels a preview back to the file form', async () => {

@@ -11,7 +11,7 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M3 App shell, profiles, accounts     | Done              |
 | M4 Import flow                       | Done, awaiting H2 |
 | M5 Transaction list and editing      | Done              |
-| ML Legacy spreadsheet import         | Next              |
+| ML Legacy spreadsheet import         | Done, awaiting H2 |
 | M6 to M10                            | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
@@ -371,3 +371,81 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 - M8: link chart and table clicks to `/transactions?category=…&from=…&to=…&owner=…`.
 - M10 mobile pass: on phones the filter bar fills the first screen; consider folding it behind a
   "Filters" button. Notes have no editor on the page yet (the API supports them).
+
+## ML: Legacy spreadsheet import (2026-11-21, branch `ml-legacy-import`)
+
+### Built
+
+- `packages/core/src/legacy/parse-legacy-workbook.ts`: `parseLegacyWorkbook(bytes, categories,
+owners)` with exceljs. Enforces every rule of the PLAN.md format specification, returns one
+  row per transaction row (the CSV engine's `ParsedOkRow` shape plus sheet, category and
+  occurrence, or an `error` row), one violation per broken rule (sheet, row, column, rule,
+  message), and per-month row counts and sheet totals. Amounts are sign-flipped into cents.
+- `fixtures/legacy/generate.ts` writes `legacy-valid.xlsx` (60 rows over 3 month sheets, a
+  Categories sheet, income and a refund as negative amounts, two identical rows, a Major Category
+  formula column, empty trailing rows) and `legacy-invalid.xlsx` (20 planted violations, listed
+  in `PLANTED_VIOLATIONS`). `pnpm fixtures:generate` now runs it too.
+- Server: `services/legacy-imports.ts` and `POST /imports/legacy/preview`; `POST
+/imports/:id/commit` sends a legacy import to the legacy commit (409 with violations or while
+  another legacy import is committed); undo is unchanged. The workbook is stored base64 in
+  `raw_csv` and parsed again at commit.
+- Web: Settings section **Legacy spreadsheet** and page `/settings/legacy-import` (upload,
+  month totals, the violation list, the rows with their sheet and row, Commit only when clean,
+  then the import result). The CSV import preview has an include checkbox on every new row
+  (unticked lines are posted as `skipLines`) and a note naming months that hold legacy rows.
+  The result page hides "Categorize new transactions" for a legacy import.
+- `.gitignore` ignores `*.xlsx` except `fixtures/legacy/*.xlsx`.
+
+### Acceptance
+
+- Golden test, valid fixture to committed JSON with sign-flipped cents:
+  `fixtures/expected/legacy-engine.test.ts` ("parses to expected/legacy-valid.json"), golden
+  `fixtures/expected/legacy-valid.json`.
+- Invalid fixture yields exactly one violation per planted violation, naming sheet, row, column
+  and rule: `legacy-engine.test.ts` ("yields exactly one violation per planted violation...",
+  "plants a violation of every rule..."). One test per rule:
+  `packages/core/src/legacy/parse-legacy-workbook.test.ts` ("one test per rule of the
+  specification", 22 tests).
+- Commit of the valid fixture inserts rows with null `account_id`, `category_source = manual`
+  and the expected per-month totals; undo removes them all; a preview with errors is 409; a second
+  legacy commit is 409: `apps/server/src/routes/legacy-imports.test.ts`.
+- A CSV commit without an account is rejected with 400: `legacy-imports.test.ts` ("the CSV
+  commit service rejects an import without an account with 400"). The database CHECK from M1 also
+  forbids a csv import with no account.
+- After a legacy commit, a CSV row with the same date, amount and description is still `new` and
+  is inserted: `legacy-imports.test.ts` ("a CSV row equal to a legacy row is still new...").
+- A CSV row unticked in the preview is not inserted and is counted as skipped: server side
+  `imports.test.ts` ("leaves out unticked lines and counts them as skipped", M4); the checkbox
+  posting `skipLines` in `apps/web/src/pages/import/import.test.tsx` ("leaves out unticked
+  rows...").
+- **Not met: "Reports include legacy rows under every owner filter".** The reports are M8's and
+  do not exist yet. M8 must add this test.
+- Playwright: `e2e/legacy-import.spec.ts` uploads the valid fixture in Settings, commits, sees
+  account "None" on the result page, opens **Transactions** filtered by **Account: None** (60
+  rows; a search finds the two Tim Hortons rows, each with account "None"), sees "None" in Import
+  history, undoes, and checks `GET /transactions?account=none` is empty. The invalid workbook's
+  20 problems and the disabled Commit are checked on both projects.
+- `pnpm check:all` passes after merging M5: 540 Vitest tests, 21 Playwright tests (1 skipped, see
+  below).
+
+### Deviations
+
+- Contract note, no shape change: a legacy import's `raw_csv` holds the workbook as base64
+  (the M1 comment said empty). Separate first commit; details in DECISIONS.md under ML.
+- `account=none` on `GET /transactions` and the **Account: None** filter come from M5 (merged
+  into this branch before the e2e check was added).
+- The legacy commit journey runs in the desktop Playwright project only. Both projects share one
+  database and only one legacy import can be committed at a time, so running it twice in
+  parallel would make one fail with 409.
+- A legacy commit with a non-empty `skipLines` is 400: legacy rows are fixed in the workbook.
+- Shared files touched beyond the milestone's area: `apps/web/src/routes.tsx` (one line),
+  `settings-page.tsx` (one section), `api/queries.ts` (one hook), `routes/imports.ts` (the
+  legacy route and the commit dispatch), `services/imports.ts` (exports), the M4 import preview
+  components (checkboxes and note, as ML's task says), `package.json` (`fixtures:generate`).
+
+### Follow-ups
+
+- M8: a test that reports include legacy rows under every owner filter (Colin, Emily, Joint, all).
+- H2: once the real workbook conforms, expect 13 month sheets, 799 rows, zero violations, and
+  compare each month's sheet total with the workbook.
+- The web bundle is 548 kB (Vite warns above 500 kB); lazy routes can wait until M8.

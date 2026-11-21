@@ -56,7 +56,7 @@ export function ImportResultPage() {
         ))}
       </dl>
       <div className="flex flex-wrap gap-2">
-        {summary.status === 'committed' && summary.insertedCount > 0 && (
+        {summary.status === 'committed' && summary.kind === 'csv' && summary.insertedCount > 0 && (
           <Button asChild>
             <Link to="/uncategorized">Categorize new transactions</Link>
           </Button>

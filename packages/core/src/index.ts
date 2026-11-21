@@ -8,3 +8,4 @@ export * from './csv/parse-csv.js';
 export * from './csv/presets.js';
 export * from './csv/sha256.js';
 export * from './money.js';
+export * from './legacy/parse-legacy-workbook.js';

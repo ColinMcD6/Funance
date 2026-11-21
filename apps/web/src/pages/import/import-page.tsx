@@ -114,9 +114,9 @@ export function ImportPage() {
           committing={commit.isPending}
           commitError={commit.error?.message ?? null}
           onCancel={cancel}
-          onCommit={() => {
+          onCommit={(skipLines) => {
             commit.mutate(
-              { id: preview.data.import.id, body: {} },
+              { id: preview.data.import.id, body: { skipLines } },
               {
                 onSuccess: (summary) => {
                   void navigate(`/import/${summary.id}`);

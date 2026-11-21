@@ -18,7 +18,7 @@
     "e2e": "playwright test",
     "check:all": "pnpm check && pnpm e2e",
     "seed:demo": "pnpm --filter @funance/server seed:demo",
-    "fixtures:generate": "tsx fixtures/generate.ts"
+    "fixtures:generate": "tsx fixtures/generate.ts && tsx fixtures/legacy/generate.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -29,6 +29,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.8",
+    "exceljs": "^4.4.0",
     "globals": "^17.14.0",
     "prettier": "^3.10.1",
     "tsx": "^4.23.15",

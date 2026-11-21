@@ -4,6 +4,7 @@ import { ImportPage } from '@/pages/import/import-page';
 import { ImportResultPage } from '@/pages/import/import-result-page';
 import { PlaceholderPage } from '@/pages/placeholder/placeholder-page';
 import { AccountFormPage } from '@/pages/settings/account-form-page';
+import { LegacyImportPage } from '@/pages/settings/legacy-import-page';
 import { SettingsPage } from '@/pages/settings/settings-page';
 import { TransactionsPage } from '@/pages/transactions/transactions-page';
 
@@ -20,5 +21,6 @@ export const PAGE_ROUTES: RouteObject[] = [
   { path: 'settings/accounts/:id', element: <AccountFormPage /> },
   { path: 'import/history', element: <ImportHistoryPage /> },
   { path: 'import/:id', element: <ImportResultPage /> },
+  { path: 'settings/legacy-import', element: <LegacyImportPage /> },
   { path: '*', element: <PlaceholderPage title="Page not found" milestone="no milestone" /> },
 ];

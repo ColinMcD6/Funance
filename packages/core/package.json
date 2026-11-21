@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@funance/shared": "workspace:*",
-    "csv-parse": "^7.0.3"
+    "csv-parse": "^7.0.3",
+    "exceljs": "^4.4.0"
   }
 }

@@ -1,5 +1,6 @@
 import { formatCents } from '@funance/core/money';
 import type { PreviewRow } from '@funance/shared';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { RowStatusBadge } from './row-status-badge';
 
@@ -7,6 +8,13 @@ type Props = {
   rows: readonly PreviewRow[];
   ownerName: (id: number | null) => string;
   categoryName: (id: number | null) => string;
+  /** Where a row is in the file; defaults to its line number. Also the row's React key. */
+  lineLabel?: (row: PreviewRow) => string;
+  /** With a selection, each `new` row gets an include checkbox. */
+  selection?: {
+    isIncluded: (row: PreviewRow) => boolean;
+    onToggle: (row: PreviewRow, included: boolean) => void;
+  };
 };
 
 function amountClass(cents: number | null): string {
@@ -17,7 +25,9 @@ function amountClass(cents: number | null): string {
  * The preview rows: a table on wide screens and a list of cards on phones. Skipped and error
  * rows show their reason where a parsed row shows its description.
  */
-export function PreviewRows({ rows, ownerName, categoryName }: Props) {
+export function PreviewRows({ rows, ownerName, categoryName, lineLabel, selection }: Props) {
+  const label = lineLabel ?? ((row: PreviewRow) => String(row.line));
+  const cardLabel = lineLabel ?? ((row: PreviewRow) => `Line ${row.line}`);
   if (rows.length === 0) {
     return <p className="text-muted-foreground text-sm">No rows with this status.</p>;
   }
@@ -29,6 +39,16 @@ export function PreviewRows({ rows, ownerName, categoryName }: Props) {
     ) : (
       row.description
     );
+  const include = (row: PreviewRow) =>
+    selection !== undefined && row.status === 'new' ? (
+      <Checkbox
+        aria-label={`Include line ${label(row)}`}
+        checked={selection.isIncluded(row)}
+        onCheckedChange={(checked) => {
+          selection.onToggle(row, checked === true);
+        }}
+      />
+    ) : null;
 
   return (
     <>
@@ -36,6 +56,7 @@ export function PreviewRows({ rows, ownerName, categoryName }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
             <tr>
+              {selection !== undefined && <th className="w-8 p-2 font-medium">Include</th>}
               <th className="p-2 font-medium">Line</th>
               <th className="p-2 font-medium">Status</th>
               <th className="p-2 font-medium">Date</th>
@@ -47,8 +68,9 @@ export function PreviewRows({ rows, ownerName, categoryName }: Props) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.line} data-testid="preview-row" className="border-t align-top">
-                <td className="text-muted-foreground p-2 tabular-nums">{row.line}</td>
+              <tr key={label(row)} data-testid="preview-row" className="border-t align-top">
+                {selection !== undefined && <td className="p-2">{include(row)}</td>}
+                <td className="text-muted-foreground p-2 tabular-nums">{label(row)}</td>
                 <td className="p-2">
                   <RowStatusBadge status={row.status} />
                 </td>
@@ -67,12 +89,17 @@ export function PreviewRows({ rows, ownerName, categoryName }: Props) {
 
       <ul className="flex flex-col divide-y rounded-md border md:hidden">
         {rows.map((row) => (
-          <li key={row.line} data-testid="preview-card" className="flex flex-col gap-1 p-3 text-sm">
+          <li
+            key={label(row)}
+            data-testid="preview-card"
+            className="flex flex-col gap-1 p-3 text-sm"
+          >
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
+                {include(row)}
                 <RowStatusBadge status={row.status} />
                 <span className="text-muted-foreground tabular-nums">
-                  Line {row.line}
+                  {cardLabel(row)}
                   {row.date !== null && ` · ${row.date}`}
                 </span>
               </span>
