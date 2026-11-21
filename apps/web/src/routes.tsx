@@ -1,4 +1,7 @@
 import type { RouteObject } from 'react-router';
+import { ImportHistoryPage } from '@/pages/import/import-history-page';
+import { ImportPage } from '@/pages/import/import-page';
+import { ImportResultPage } from '@/pages/import/import-result-page';
 import { PlaceholderPage } from '@/pages/placeholder/placeholder-page';
 import { AccountFormPage } from '@/pages/settings/account-form-page';
 import { SettingsPage } from '@/pages/settings/settings-page';
@@ -8,11 +11,13 @@ export const PAGE_ROUTES: RouteObject[] = [
   { index: true, element: <PlaceholderPage title="Dashboard" milestone="M8" /> },
   { path: 'transactions', element: <PlaceholderPage title="Transactions" milestone="M5" /> },
   { path: 'uncategorized', element: <PlaceholderPage title="Uncategorized" milestone="M7" /> },
-  { path: 'import', element: <PlaceholderPage title="Import" milestone="M4" /> },
+  { path: 'import', element: <ImportPage /> },
   { path: 'rules', element: <PlaceholderPage title="Rules" milestone="M6" /> },
   { path: 'categories', element: <PlaceholderPage title="Categories" milestone="M6" /> },
   { path: 'settings', element: <SettingsPage /> },
   { path: 'settings/accounts/new', element: <AccountFormPage /> },
   { path: 'settings/accounts/:id', element: <AccountFormPage /> },
+  { path: 'import/history', element: <ImportHistoryPage /> },
+  { path: 'import/:id', element: <ImportResultPage /> },
   { path: '*', element: <PlaceholderPage title="Page not found" milestone="no milestone" /> },
 ];

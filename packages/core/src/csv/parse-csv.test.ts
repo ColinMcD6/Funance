@@ -1,6 +1,6 @@
 import type { CsvMapping, CsvPresetId } from '@funance/shared';
 import { describe, expect, it } from 'vitest';
-import { parseCsv, type ParsedOkRow, type ParsedRow } from './parse-csv.js';
+import { missingCsvColumns, parseCsv, type ParsedOkRow, type ParsedRow } from './parse-csv.js';
 import { getCsvPreset } from './presets.js';
 
 /** Bytes of an ASCII string (tests that need other bytes build them by hand). */
@@ -428,5 +428,40 @@ describe('parseCsv', () => {
       const row = only(parseCsv(csv, getCsvPreset(id as CsvPresetId).mapping, OWNER));
       expect('reason' in row ? row.reason : '').not.toContain('Missing column');
     }
+  });
+});
+
+describe('missingCsvColumns', () => {
+  it('is empty when every mapped column is in the header (names trimmed)', () => {
+    expect(missingCsvColumns(ascii(' Date , Desc ,Amount\n2026-10-01,x,1\n'), BASE)).toEqual([]);
+  });
+
+  it('names each mapped column the header lacks, in mapping order', () => {
+    const mapping: CsvMapping = {
+      ...BASE,
+      columns: { ...BASE.columns, memo: 'Memo' },
+      skipWhen: [{ column: 'Status', notEquals: 'OK' }],
+    };
+    expect(missingCsvColumns(ascii('When,Desc,Spent\n'), mapping)).toEqual([
+      'Date',
+      'Memo',
+      'Amount',
+      'Status',
+    ]);
+  });
+
+  it('checks column numbers against the first row of a headerless file', () => {
+    const mapping: CsvMapping = {
+      ...BASE,
+      hasHeader: false,
+      columns: { date: '1', description: ['2'], amount: '4' },
+    };
+    expect(missingCsvColumns(ascii('2026-10-01,x,1\n'), mapping)).toEqual(['4']);
+    expect(missingCsvColumns(ascii('2026-10-01,x,1,2\n'), mapping)).toEqual([]);
+  });
+
+  it('is empty for an empty file or an unreadable first row', () => {
+    expect(missingCsvColumns(ascii(''), BASE)).toEqual([]);
+    expect(missingCsvColumns(ascii('"Date,Desc\n'), BASE)).toEqual([]);
   });
 });
