@@ -1,10 +1,20 @@
 import type {
   CommitImportRequest,
   CreateAccountRequest,
+  TransactionListResponse,
+  TransactionPatch,
+  TransactionQuery,
   UpdateAccountRequest,
 } from '@funance/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
+import {
+  bulkUpdateTransactions,
   commitImport,
   createAccount,
   getImport,
@@ -14,10 +24,12 @@ import {
   listCsvPresets,
   listImports,
   listOwners,
+  listTransactions,
   previewImport,
   renameOwner,
   undoImport,
   updateAccount,
+  updateTransaction,
 } from './client';
 
 // TanStack Query hooks over the typed client. Query keys: one list per resource.
@@ -30,6 +42,8 @@ export const queryKeys = {
   categories: ['categories'],
   imports: ['imports'],
   importDetail: (id: number) => ['imports', id] as const,
+  transactions: ['transactions'],
+  transactionList: (query: TransactionQuery) => ['transactions', query] as const,
 } as const;
 
 export function useHealth() {
@@ -111,5 +125,91 @@ export function useUndoImport() {
   return useMutation({
     mutationFn: (id: number) => undoImport(id),
     onSuccess: () => client.invalidateQueries(),
+  });
+}
+
+/** One page of transactions; the previous page stays on screen while the next one loads. */
+export function useTransactions(query: TransactionQuery) {
+  return useQuery({
+    queryKey: queryKeys.transactionList(query),
+    queryFn: () => listTransactions(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Shows an edit in every cached transaction list at once, so an inline select does not snap back
+ * while the request runs. Returns the previous lists, to put back if the request fails.
+ */
+function applyOptimisticPatch(
+  client: QueryClient,
+  ids: readonly number[],
+  patch: TransactionPatch,
+) {
+  const idSet = new Set(ids);
+  // categorySource is recorded by the server; the visible fields are the rest.
+  const fields = {
+    ...(patch.ownerId !== undefined && { ownerId: patch.ownerId }),
+    ...(patch.categoryId !== undefined && { categoryId: patch.categoryId }),
+    ...(patch.notes !== undefined && { notes: patch.notes }),
+    ...(patch.excluded !== undefined && { excluded: patch.excluded }),
+  };
+  const previous = client.getQueriesData<TransactionListResponse>({
+    queryKey: queryKeys.transactions,
+  });
+  client.setQueriesData<TransactionListResponse>({ queryKey: queryKeys.transactions }, (old) =>
+    old === undefined
+      ? old
+      : {
+          ...old,
+          items: old.items.map((t) => (idSet.has(t.id) ? { ...t, ...fields } : t)),
+        },
+  );
+  return previous;
+}
+
+function transactionEditOptions<V>(
+  client: QueryClient,
+  target: (vars: V) => {
+    ids: readonly number[];
+    patch: TransactionPatch;
+  },
+) {
+  return {
+    onMutate: async (vars: V) => {
+      await client.cancelQueries({ queryKey: queryKeys.transactions });
+      const { ids, patch } = target(vars);
+      return applyOptimisticPatch(client, ids, patch);
+    },
+    onError: (
+      _error: Error,
+      _vars: V,
+      previous: ReturnType<typeof applyOptimisticPatch> | undefined,
+    ) => {
+      for (const [key, data] of previous ?? []) client.setQueryData(key, data);
+    },
+    // Edits change lists, counts and (later) reports, so every cached query refetches.
+    onSettled: () => client.invalidateQueries(),
+  };
+}
+
+export function useUpdateTransaction() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: TransactionPatch }) =>
+      updateTransaction(id, patch),
+    ...transactionEditOptions(client, ({ id, patch }: { id: number; patch: TransactionPatch }) => ({
+      ids: [id],
+      patch,
+    })),
+  });
+}
+
+export function useBulkUpdateTransactions() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, patch }: { ids: number[]; patch: TransactionPatch }) =>
+      bulkUpdateTransactions(ids, patch),
+    ...transactionEditOptions(client, (vars: { ids: number[]; patch: TransactionPatch }) => vars),
   });
 }

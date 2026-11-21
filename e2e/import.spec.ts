@@ -48,6 +48,13 @@ async function statusesInDatabase(page: Page, accountId: number) {
   return { new: count('new'), duplicate: count('duplicate') };
 }
 
+/** How many transactions the account holds, from GET /transactions. */
+async function transactionCount(page: Page, accountId: number): Promise<number> {
+  const res = await page.request.get(`/api/transactions?account=${accountId}&pageSize=1`);
+  expect(res.status()).toBe(200);
+  return ((await res.json()) as { total: number }).total;
+}
+
 test('import a statement, commit, find its rows, undo, and see them gone', async ({
   page,
 }, testInfo) => {
@@ -87,6 +94,7 @@ test('import a statement, commit, find its rows, undo, and see them gone', async
 
   // The rows are in the database: previewing the same file again finds every one of them.
   expect(await statusesInDatabase(page, accountId)).toEqual({ new: 0, duplicate: 38 });
+  expect(await transactionCount(page, accountId)).toBe(38);
 
   await page.getByRole('link', { name: 'Import history' }).click();
   await page.getByRole('button', { name: `Undo import ${importId}` }).click();
@@ -103,6 +111,7 @@ test('import a statement, commit, find its rows, undo, and see them gone', async
 
   // Undone: the account holds none of the rows any more.
   expect(await statusesInDatabase(page, accountId)).toEqual({ new: 38, duplicate: 0 });
+  expect(await transactionCount(page, accountId)).toBe(0);
 });
 
 test('a file whose headers do not match the mapping shows the missing columns', async ({
