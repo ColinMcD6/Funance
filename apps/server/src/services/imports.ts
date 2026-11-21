@@ -56,14 +56,19 @@ const summaryColumns = {
   kind: imports.kind,
 };
 
-function findSummary(db: DbOrTx, id: number): ImportSummary | undefined {
+export function findSummary(db: DbOrTx, id: number): ImportSummary | undefined {
   return db.select(summaryColumns).from(imports).where(eq(imports.id, id)).get();
 }
 
-function requireSummary(db: DbOrTx, id: number): ImportSummary {
+export function requireSummary(db: DbOrTx, id: number): ImportSummary {
   const summary = findSummary(db, id);
   if (summary === undefined) throw notFound('Import', id);
   return summary;
+}
+
+/** The kind of import `id` (404 when there is none), so the commit route can pick its service. */
+export function getImportKind(db: Db, id: number): ImportSummary['kind'] {
+  return requireSummary(db, id).kind;
 }
 
 /** Every import, newest first, previews included. */

@@ -6,6 +6,7 @@ import {
   importListResponseSchema,
   importPreviewFormSchema,
   importPreviewResponseSchema,
+  legacyPreviewResponseSchema,
   undoImportResponseSchema,
 } from '@funance/shared';
 import { Hono, type Context } from 'hono';
@@ -16,10 +17,12 @@ import { requireProfile } from '../profile.js';
 import {
   commitImport,
   getImportDetail,
+  getImportKind,
   listImports,
   previewImport,
   undoImport,
 } from '../services/imports.js';
+import { commitLegacyImport, previewLegacyImport } from '../services/legacy-imports.js';
 import type { RuleEngine } from '../services/rule-engine.js';
 
 /** Reads the multipart form of POST /imports/preview: a `file` and the text fields. */
@@ -43,7 +46,7 @@ async function readUpload(c: Context): Promise<{ file: File; fields: Record<stri
   return { file, fields };
 }
 
-/** POST /imports/preview, POST /imports/:id/commit, POST /imports/:id/undo, GET /imports(/:id). */
+/** POST /imports/preview, POST /imports/legacy/preview, POST /imports/:id/commit, POST /imports/:id/undo, GET /imports(/:id). */
 export function importRoutes(db: Db, clock: Clock, ruleEngine: RuleEngine): Hono {
   const routes = new Hono();
 
@@ -65,6 +68,17 @@ export function importRoutes(db: Db, clock: Clock, ruleEngine: RuleEngine): Hono
     return c.json(importPreviewResponseSchema.parse(preview), 201);
   });
 
+  routes.post('/legacy/preview', async (c) => {
+    const profile = requireProfile(c, db);
+    const { file } = await readUpload(c);
+    const preview = await previewLegacyImport(db, clock, {
+      filename: file.name === '' ? 'upload.xlsx' : file.name,
+      content: new Uint8Array(await file.arrayBuffer()),
+      uploadedByOwnerId: profile.id,
+    });
+    return c.json(legacyPreviewResponseSchema.parse(preview), 201);
+  });
+
   routes.get('/:id', (c) => {
     const { id } = parseParams(c, idParamSchema);
     return c.json(importDetailResponseSchema.parse(getImportDetail(db, id)));
@@ -77,7 +91,10 @@ export function importRoutes(db: Db, clock: Clock, ruleEngine: RuleEngine): Hono
       c.req.header('content-type') === undefined
         ? commitImportRequestSchema.parse({})
         : await parseJsonBody(c, commitImportRequestSchema);
-    const summary = commitImport(db, clock, ruleEngine, id, body.skipLines);
+    const summary =
+      getImportKind(db, id) === 'legacy'
+        ? await commitLegacyImport(db, clock, id, body.skipLines)
+        : commitImport(db, clock, ruleEngine, id, body.skipLines);
     return c.json(commitImportResponseSchema.parse(summary));
   });
 

@@ -22,3 +22,7 @@ Statement Samples/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Spreadsheets may be real data (the legacy workbook); only the synthetic fixtures are committed
+*.xlsx
+!fixtures/legacy/*.xlsx

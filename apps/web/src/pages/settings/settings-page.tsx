@@ -1,4 +1,5 @@
 import { AccountList } from './account-list';
+import { LegacyImportSection } from './legacy-import-section';
 import { OwnerNames } from './owner-names';
 
 /** Settings: owner names and accounts. Later milestones add sections here. */
@@ -8,6 +9,7 @@ export function SettingsPage() {
       <h1 className="text-2xl font-semibold">Settings</h1>
       <OwnerNames />
       <AccountList />
+      <LegacyImportSection />
     </div>
   );
 }

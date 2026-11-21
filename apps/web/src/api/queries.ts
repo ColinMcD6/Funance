@@ -15,6 +15,7 @@ import {
   listImports,
   listOwners,
   previewImport,
+  previewLegacyImport,
   renameOwner,
   undoImport,
   updateAccount,
@@ -94,6 +95,10 @@ export function usePreviewImport() {
     mutationFn: ({ accountId, file }: { accountId: number; file: File }) =>
       previewImport(accountId, file, file.name),
   });
+}
+
+export function usePreviewLegacyImport() {
+  return useMutation({ mutationFn: (file: File) => previewLegacyImport(file, file.name) });
 }
 
 /** Commit and undo change transactions, so every cached query (lists, reports, counts) refetches. */
