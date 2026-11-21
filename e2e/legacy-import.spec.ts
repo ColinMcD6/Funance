@@ -28,7 +28,7 @@ async function legacyMonthsSeenByStatement(page: Page): Promise<string[]> {
 
 // Only one legacy import may be committed at a time and both browser projects share one
 // database, so the commit journey runs in the desktop project only.
-test('upload the legacy workbook in Settings, commit, find its rows with no account, undo', async ({
+test('upload the legacy workbook in Settings, commit, find its rows under Account: None, undo', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'one committed legacy import at a time');
@@ -59,6 +59,28 @@ test('upload the legacy workbook in Settings, commit, find its rows with no acco
   // The rows are in the database with no account: a statement for September sees them.
   expect(await legacyMonthsSeenByStatement(page)).toEqual(['2026-09']);
 
+  // Transactions filtered by Account: None lists the legacy rows.
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .filter({ visible: true })
+    .getByRole('link', { name: 'Transactions' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
+  await page.getByLabel('Account', { exact: true }).selectOption({ label: 'None (legacy)' });
+  await expect(page).toHaveURL(/[?&]account=none(&|$)/);
+  await expect(page.getByTestId('range')).toHaveText('1–50 of 60');
+  await page.getByLabel('Search').fill('Tim Hortons');
+  await page.getByLabel('Search').press('Enter');
+  await expect(page.getByTestId('range')).toHaveText('1–2 of 2');
+  const legacyRows = page.getByTestId('transaction-row');
+  await expect(legacyRows).toHaveCount(2);
+  for (const row of await legacyRows.all()) await expect(row).toContainText('None');
+
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .filter({ visible: true })
+    .getByRole('link', { name: 'Import' })
+    .click();
   await page.getByRole('link', { name: 'Import history' }).click();
   const historyRow = page.getByTestId('import-row').filter({ hasText: `#${importId} ·` });
   await expect(historyRow).toContainText('None');
@@ -67,6 +89,8 @@ test('upload the legacy workbook in Settings, commit, find its rows with no acco
   await dialog.getByRole('button', { name: 'Undo import' }).click();
   await expect(historyRow.getByText('Undone', { exact: true })).toBeVisible();
   expect(await legacyMonthsSeenByStatement(page)).toEqual([]);
+  const afterUndo = await page.request.get('/api/transactions?account=none');
+  expect(((await afterUndo.json()) as { total: number }).total).toBe(0);
 });
 
 test('a workbook breaking the format lists each problem and cannot be committed', async ({
