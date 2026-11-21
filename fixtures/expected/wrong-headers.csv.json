@@ -1,0 +1,69 @@
+{
+  "fixture": "wrong-headers.csv",
+  "preset": "tangerine-chequing",
+  "ownerDefaults": {
+    "defaultOwnerId": 3
+  },
+  "rows": [
+    {
+      "line": 2,
+      "raw": {
+        "When": "2026-10-01",
+        "Payee": "Corner Store",
+        "Spent": "12.50",
+        "Received": "",
+        "Balance": "987.50"
+      },
+      "status": "error",
+      "reason": "Missing column(s): Date, Memo, Amount"
+    },
+    {
+      "line": 3,
+      "raw": {
+        "When": "2026-10-02",
+        "Payee": "Paycheque",
+        "Spent": "",
+        "Received": "1850.00",
+        "Balance": "2837.50"
+      },
+      "status": "error",
+      "reason": "Missing column(s): Date, Memo, Amount"
+    },
+    {
+      "line": 4,
+      "raw": {
+        "When": "2026-10-03",
+        "Payee": "Bakery",
+        "Spent": "6.25",
+        "Received": "",
+        "Balance": "2831.25"
+      },
+      "status": "error",
+      "reason": "Missing column(s): Date, Memo, Amount"
+    },
+    {
+      "line": 5,
+      "raw": {
+        "When": "2026-10-04",
+        "Payee": "Bookshop",
+        "Spent": "24.99",
+        "Received": "",
+        "Balance": "2806.26"
+      },
+      "status": "error",
+      "reason": "Missing column(s): Date, Memo, Amount"
+    },
+    {
+      "line": 6,
+      "raw": {
+        "When": "2026-10-05",
+        "Payee": "Refund",
+        "Spent": "",
+        "Received": "10.00",
+        "Balance": "2816.26"
+      },
+      "status": "error",
+      "reason": "Missing column(s): Date, Memo, Amount"
+    }
+  ]
+}

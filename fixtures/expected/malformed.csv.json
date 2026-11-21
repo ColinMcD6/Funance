@@ -1,0 +1,139 @@
+{
+  "fixture": "malformed.csv",
+  "preset": "tangerine-chequing",
+  "ownerDefaults": {
+    "defaultOwnerId": 3
+  },
+  "rows": [
+    {
+      "line": 2,
+      "raw": {
+        "Date": "10/01/2026",
+        "Transaction": "OTHER",
+        "Name": "Interac - Purchase - SOBEYS 4567",
+        "Memo": "Interac - Purchase - SOBEYS 4567 WINNIPEG  MB  CA",
+        "Amount": "-42.10"
+      },
+      "status": "parsed",
+      "date": "2026-10-01",
+      "postedDate": null,
+      "amountCents": -4210,
+      "description": "Interac - Purchase - SOBEYS 4567 WINNIPEG MB CA",
+      "memo": null,
+      "merchantKey": "SOBEYS WINNIPEG MB",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "f1720e51a24a09025679f518e4cf8858a4162b1fa50b63cd7d7a6f569e56d7f7",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 3,
+      "raw": {
+        "Date": "13/45/2026",
+        "Transaction": "OTHER",
+        "Name": "Interac - Purchase - DOLLARAMA 11",
+        "Memo": "Interac - Purchase - DOLLARAMA 1102 WINNIPEG  MB  CA",
+        "Amount": "-10.00"
+      },
+      "status": "error",
+      "reason": "Date \"13/45/2026\" is not a MM/dd/yyyy date"
+    },
+    {
+      "line": 4,
+      "raw": {
+        "Date": "10/03/2026",
+        "Transaction": "OTHER",
+        "Name": "Interac - Purchase - SHELL C1234",
+        "Memo": "Interac - Purchase - SHELL C12345 WINNIPEG  MB  CA",
+        "Amount": "abc"
+      },
+      "status": "error",
+      "reason": "Amount \"abc\" is not a number with at most 2 decimals"
+    },
+    {
+      "line": 5,
+      "raw": {
+        "Date": "10/04/2026",
+        "Transaction": "OTHER",
+        "Name": "ABM Withdrawal"
+      },
+      "status": "error",
+      "reason": "Row has 3 fields, the header has 5"
+    },
+    {
+      "line": 6,
+      "raw": {
+        "Date": ""
+      },
+      "status": "skipped",
+      "reason": "Blank line"
+    },
+    {
+      "line": 7,
+      "raw": {
+        "Date": "10/06/2026",
+        "Transaction": "OTHER",
+        "Name": "Interac - Purchase - TIM HORTONS",
+        "Memo": "Interac - Purchase - TIM HORTONS 0871 WINNIPEG  MB  CA",
+        "Amount": "-4.35"
+      },
+      "status": "parsed",
+      "date": "2026-10-06",
+      "postedDate": null,
+      "amountCents": -435,
+      "description": "Interac - Purchase - TIM HORTONS 0871 WINNIPEG MB CA",
+      "memo": null,
+      "merchantKey": "TIM HORTONS WINNIPEG",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "8b5df920979f9fb7c389f2b5bc4fa842830d32cdd1ab4b3737c6f60b9b016749",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 8,
+      "raw": {
+        "Date": "10/07/2026",
+        "Transaction": "OTHER",
+        "Name": "EFT Deposit from Northwind Mfg",
+        "Memo": "EFT Deposit from Northwind Mfg",
+        "Amount": "1850.00"
+      },
+      "status": "parsed",
+      "date": "2026-10-07",
+      "postedDate": null,
+      "amountCents": 185000,
+      "description": "EFT Deposit from Northwind Mfg",
+      "memo": null,
+      "merchantKey": "EFT DEPOSIT FROM",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "feebf312fd082dc6344793e70c7dc56bebdaf78c32f27f6acfc293c48c835f14",
+      "ownerHint": null,
+      "ownerId": 3
+    },
+    {
+      "line": 9,
+      "raw": {
+        "Date": "10/08/2026",
+        "Transaction": "OTHER",
+        "Name": "Interest Paid",
+        "Memo": "Interest Paid",
+        "Amount": "0.01"
+      },
+      "status": "parsed",
+      "date": "2026-10-08",
+      "postedDate": null,
+      "amountCents": 1,
+      "description": "Interest Paid",
+      "memo": null,
+      "merchantKey": "INTEREST PAID",
+      "bankCategory": null,
+      "externalId": null,
+      "dedupKey": "7763a76bc7d725917cc86368cf73eaf29f91b87f1a7a54b716efd52120c03f40",
+      "ownerHint": null,
+      "ownerId": 3
+    }
+  ]
+}
