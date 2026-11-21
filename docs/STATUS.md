@@ -7,7 +7,8 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | ------------------------------------ | ----------------- |
 | M0 Scaffold and tooling              | Done              |
 | M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
-| M2, M3, M5 (parallel after H1)       | Next              |
+| M2 CSV engine                        | Done              |
+| M3, M5 (parallel after H1)           | Next              |
 | M4, M6 to M10, ML                    | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
@@ -107,3 +108,56 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 - No `GET /session` route is in the plan; M3 may need one to learn the active profile if the
   cookie is HTTP-only. That would be a contract change.
 - M2 should produce golden files in `fixtures/expected` from these fixtures.
+
+## M2: CSV engine (2026-11-20, branch `m2-csv-engine`)
+
+### Built
+
+- `packages/core/src/csv`, pure, no I/O:
+  - `parse-csv.ts`: `parseCsv(content, mapping, ownerDefaults)` returns one `ParsedRow` per data
+    row, `parsed` (normalized fields, `merchantKey`, `dedupKey`, owner) or `skipped` / `error`
+    with a reason, each with its line number and raw row. Handles BOM, encodings, trimmed headers,
+    description joining, sign normalization, outflow/inflow columns, bank-category regex, owner
+    hints, account filter, `skipWhen`, zero-amount skips, and malformed CSV without throwing.
+  - `amount.ts` (`parseAmountCents`), `date.ts` (`parseCsvDate`), `decode.ts`, `sha256.ts`,
+    `dedup.ts` (`dedupKey`), `merchant.ts` (`merchantKey`), `occurrences.ts`
+    (`assignOccurrences`, the n − m rule).
+  - The five presets were already correct against the fixtures; unchanged.
+- `fixtures/expected`: one golden JSON per fixture and `csv-engine.test.ts`.
+
+### Acceptance
+
+- Golden tests, each fixture parses to its committed JSON: `fixtures/expected/csv-engine.test.ts`
+  ("golden files").
+- Amount tests for `$1,200.00`, `-$1,200.00`, `(45.10)`, `0.01`, empty, non-numeric:
+  `packages/core/src/csv/amount.test.ts`.
+- Walmart external ids without quotes, two cardholders to two owners: `csv-engine.test.ts`
+  ("Walmart Mastercard").
+- Tangerine chequing skips its zero-amount marker rows as `skipped`: `csv-engine.test.ts`
+  ("Tangerine chequing").
+- Malformed fixture gives `error` rows with reasons (bad date, non-numeric amount, short row) and a
+  skipped blank line, without throwing; a file matching no preset errors on every row:
+  `csv-engine.test.ts` ("malformed input"), plus `parse-csv.test.ts` for bad quoting and missing
+  columns.
+- Occurrences: same file twice gives 0 new; the overlapping pair gives 24 new (25 new rows less one
+  zero-amount marker) and 10 duplicates; four identical rows against two existing give two new:
+  `csv-engine.test.ts` ("occurrences") and `occurrences.test.ts`.
+- `packages/core` line coverage 98.95% (threshold 90%).
+- `pnpm check:all` passes: 266 Vitest tests, 4 Playwright tests.
+
+### Deviations
+
+- `parseCsv` takes a `Uint8Array` (a `Buffer` is one) instead of `Buffer`, and SHA-256 and text
+  decoding are hand-written, to keep core free of Node APIs. Details in DECISIONS.md under M2.
+- Golden tests live in `fixtures/expected` (Node types available there) rather than in core.
+
+### Follow-ups
+
+- M4: map `AssignedRow` to `previewRowSchema` (same field names); `existingCountsByKey` is the
+  count of the account's transactions per `dedup_key`. File-level problems (missing columns)
+  arrive as the same reason on every row; the preview may want to show it once.
+- M3/M4: the RBC preset has no `accountFilterValue`, so a file holding two RBC accounts imports
+  both until the account form sets one.
+- M7/H2: RBC descriptions start with a transaction type ("CONTACTLESS INTERAC PURCHASE TIM
+  HORTONS"), so their merchant keys hold no merchant name. PLAN.md's prefix list has only
+  Tangerine and card-processor prefixes; extend it once a real RBC export is seen.

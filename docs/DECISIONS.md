@@ -119,3 +119,47 @@ choices made where PLAN.md section 2 left room, recorded so later milestones bui
   the PLAN.md formula; its `merchant_key` values are hand-written, not produced by M2's function.
 - **Fixture CSVs use LF line endings** and are marked `-text` in `.gitattributes` so git never
   rewrites their bytes. Check real exports' line endings at H1.
+
+## 2026-11-20 · M2
+
+### Dependencies
+
+| Package           | Where | Why                                                                      |
+| ----------------- | ----- | ------------------------------------------------------------------------ |
+| `csv-parse` 7.0.3 | core  | CSV parser from the PLAN.md stack table; `csv-parse/sync` splits records |
+
+### Choices made in the CSV engine
+
+- **`parseCsv` takes a `Uint8Array`** (a Node `Buffer` is one), not `Buffer`, so the core library
+  stays free of Node types (`packages/core/tsconfig.json` keeps `types: []`).
+- **No platform APIs in core.** UTF-8/latin1 decoding (`csv/decode.ts`) and SHA-256
+  (`csv/sha256.ts`) are written by hand. SHA-256 is checked against the NIST vectors and against
+  `node:crypto` for every fixture row; it yields the same keys as `demo-seed.ts`.
+- **`ParsedRow` and `AssignedRow` are defined in core** (`csv/parse-csv.ts`, `csv/occurrences.ts`).
+  They are internal results of core functions, not entity or API shapes; their field names match
+  `previewRowSchema`, so M4 maps them one to one. Parsed rows carry `merchantKey` and `dedupKey`.
+- **Recovery from malformed quoting.** After a bad quote, csv-parse swallows the rest of the file.
+  The engine reports the failing record as an `error` row on the line where it starts and restarts
+  parsing on the next line, so no row disappears silently.
+- **File-level problems become row errors.** Mapped columns missing from the header, or an invalid
+  user regex (`bankCategoryRegex`, `skipWhen.matches`), are reported as the reason on every row;
+  `parseCsv` never throws on input. A completely blank line is a `skipped` row ("Blank line").
+- **Row width.** A row with a different number of fields from the header is an `error`.
+- **Dates.** Day and month may have one or two digits in every slash format (a file re-saved by a
+  spreadsheet drops the zeros); the year needs four digits; impossible dates are errors.
+- **Amounts.** Accepts a sign before or after `$`, parentheses, at most two decimals; more decimals
+  are an error rather than rounded. Zero is never `-0`. With `outflow`/`inflow`, amount =
+  |inflow| − |outflow|; both empty is an error.
+- **`skipWhen`.** An entry skips a row when all of its given tests hold (`notEquals` and
+  `matches`); an entry with neither never skips. `matches` is case-insensitive.
+- **Account filter** only applies when `accountFilterValue` is set; without one, every row is read.
+- **Owner hints** are matched trimmed and case-insensitively against `ownerHintMap` keys.
+- **External ids** have every `"` removed (Walmart's `"""…"""` cells).
+- **Merchant key.** Commas separate tokens as spaces do (`SAFEWAY #1234, WINNIPEG` →
+  `SAFEWAY WINNIPEG MB`). If every token holds a digit, the key is the cleaned description, so it
+  is never empty.
+- **Headerless files** (`hasHeader: false`) name columns by 1-based number (`"1"`, `"2"`, ...).
+- **`raw`** is keyed by the trimmed header name.
+- **Golden files** live in `fixtures/expected/<fixture>.json`, checked by
+  `fixtures/expected/csv-engine.test.ts`, which imports core by relative path (the repo root has no
+  workspace dependency on it). Rewrite with `UPDATE_GOLDEN=1 pnpm vitest run --project fixtures`.
