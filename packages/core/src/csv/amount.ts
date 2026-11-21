@@ -10,7 +10,7 @@ export type AmountParse =
  * `$1,200.00` → 120000, `-$1,200.00` → -120000, `(45.10)` → -4510, `` → empty.
  */
 export function parseAmountCents(text: string): AmountParse {
-  let s = text.replace(/[\s$,]/g, '');
+  let s = text.replace(/[\s$]/g, '');
   if (s === '') return { kind: 'empty' };
 
   let negative = false;
@@ -23,8 +23,10 @@ export function parseAmountCents(text: string): AmountParse {
     s = s.slice(1);
   }
 
-  const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(s);
-  const whole = match?.[1] ?? '';
+  // Commas are thousands separators only, in groups of three. Anything else (a decimal comma such
+  // as "12,34" in a French export) is rejected rather than read as a much larger amount.
+  const match = /^(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d{0,2}))?$/.exec(s);
+  const whole = (match?.[1] ?? '').replace(/,/g, '');
   const fraction = match?.[2] ?? '';
   if (match === null || (whole === '' && fraction === '')) {
     return {

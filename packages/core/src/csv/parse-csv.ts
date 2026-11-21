@@ -48,25 +48,61 @@ export type ParsedRow = ParsedOkRow | ParsedSkippedRow | ParsedErrorRow;
 
 type Record_ = { fields: string[]; line: number } | { error: string; line: number };
 
-/** Offset in `text` where each physical line starts (index 0 is line 1). */
-function lineStarts(text: string): number[] {
-  const starts = [0];
-  const re = /\r\n|\n|\r/g;
-  for (let m = re.exec(text); m !== null; m = re.exec(text)) starts.push(m.index + m[0].length);
-  return starts;
+/** UTF-8 length of one UTF-16 code unit sequence position (surrogate pairs count 2 + 2). */
+function utf8Length(code: number): number {
+  if (code < 0x80) return 1;
+  if (code < 0x800) return 2;
+  if (code >= 0xd800 && code <= 0xdfff) return 2; // half of a 4-byte character
+  return 3;
+}
+
+/**
+ * Where each physical line starts (index 0 is line 1), as a UTF-16 offset into `text` (for
+ * slicing) and as a UTF-8 byte offset (csv-parse reports positions in UTF-8 bytes).
+ */
+function lineStarts(text: string): { chars: number[]; bytes: number[] } {
+  const chars = [0];
+  const bytes = [0];
+  let byte = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    byte += utf8Length(code);
+    const isBreak = code === 0x0a || (code === 0x0d && text.charCodeAt(i + 1) !== 0x0a);
+    if (isBreak) {
+      chars.push(i + 1);
+      bytes.push(byte);
+    }
+  }
+  return { chars, bytes };
+}
+
+/** The 1-based line holding UTF-8 byte `offset`. */
+function lineAtByte(byteStarts: readonly number[], offset: number): number {
+  let lo = 0;
+  let hi = byteStarts.length - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if ((byteStarts[mid] ?? 0) <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1;
 }
 
 /**
  * Splits the text into records without throwing. After a malformed record csv-parse cannot
  * resynchronise (a stray quote swallows the rest of the file), so the record that failed is
  * reported as an error on the line where it starts, and parsing restarts on the next line.
+ *
+ * Line numbers come from csv-parse's byte position (`context.bytes`), not its line count, which
+ * counts a CRLF inside a quoted cell as two lines.
  */
 function readRecords(text: string): Record_[] {
   const starts = lineStarts(text);
   const events: Record_[] = [];
   let fromLine = 1;
-  while (fromLine <= starts.length) {
-    const failed = readRecordsFrom(text.slice(starts[fromLine - 1]), fromLine, events);
+  while (fromLine <= starts.chars.length) {
+    const chunk = text.slice(starts.chars[fromLine - 1]);
+    const failed = readRecordsFrom(chunk, starts.bytes[fromLine - 1] ?? 0, starts.bytes, events);
     if (failed === null) break;
     // Line numbers in the message are relative to the restarted chunk, so drop them.
     const message = failed.message.replace(/ at line \d+/g, '');
@@ -77,18 +113,21 @@ function readRecords(text: string): Record_[] {
 }
 
 /**
- * Appends the records of `chunk` (which starts on line `fromLine`) to `events`, up to the first
- * malformed record, and returns where that record starts, or null when the chunk was clean.
+ * Appends the records of `chunk` (which starts at UTF-8 byte `baseByte` of the file) to
+ * `events`, up to the first malformed record, and returns the line where that record starts,
+ * or null when the chunk was clean.
  */
 function readRecordsFrom(
   chunk: string,
-  fromLine: number,
+  baseByte: number,
+  byteStarts: readonly number[],
   events: Record_[],
 ): { line: number; message: string } | null {
-  const state: { lastEndLine: number; failed: { line: number; message: string } | null } = {
-    lastEndLine: fromLine - 1,
+  const state: { lastEndByte: number; failed: { line: number; message: string } | null } = {
+    lastEndByte: 0,
     failed: null,
   };
+  const startLine = (): number => lineAtByte(byteStarts, baseByte + state.lastEndByte);
   parse(chunk, {
     bom: false,
     relax_column_count: true,
@@ -96,13 +135,13 @@ function readRecordsFrom(
     skip_records_with_error: true,
     on_record: (record, context) => {
       if (state.failed === null) {
-        events.push({ fields: record, line: state.lastEndLine + 1 });
-        state.lastEndLine = fromLine - 1 + context.lines;
+        events.push({ fields: record, line: startLine() });
+        state.lastEndByte = context.bytes;
       }
       return null;
     },
     on_skip: (err) => {
-      state.failed ??= { line: state.lastEndLine + 1, message: err?.message ?? 'unknown error' };
+      state.failed ??= { line: startLine(), message: err?.message ?? 'unknown error' };
     },
   });
   return state.failed;

@@ -140,7 +140,9 @@ choices made where PLAN.md section 2 left room, recorded so later milestones bui
   `previewRowSchema`, so M4 maps them one to one. Parsed rows carry `merchantKey` and `dedupKey`.
 - **Recovery from malformed quoting.** After a bad quote, csv-parse swallows the rest of the file.
   The engine reports the failing record as an `error` row on the line where it starts and restarts
-  parsing on the next line, so no row disappears silently.
+  parsing on the next line, so no row disappears silently. Line numbers come from csv-parse's byte
+  position (`context.bytes`, UTF-8 bytes) mapped to line starts, not from its line count, which
+  counts a CRLF inside a quoted cell as two lines.
 - **File-level problems become row errors.** Mapped columns missing from the header, or an invalid
   user regex (`bankCategoryRegex`, `skipWhen.matches`), are reported as the reason on every row;
   `parseCsv` never throws on input. A completely blank line is a `skipped` row ("Blank line").
@@ -148,7 +150,8 @@ choices made where PLAN.md section 2 left room, recorded so later milestones bui
 - **Dates.** Day and month may have one or two digits in every slash format (a file re-saved by a
   spreadsheet drops the zeros); the year needs four digits; impossible dates are errors.
 - **Amounts.** Accepts a sign before or after `$`, parentheses, at most two decimals; more decimals
-  are an error rather than rounded. Zero is never `-0`. With `outflow`/`inflow`, amount =
+  are an error rather than rounded. A comma is accepted only as a thousands separator in groups of
+  three (`1,234.56`); a decimal comma (`12,34`, `45,10 $`) is an error, not $1,234.00. Zero is never `-0`. With `outflow`/`inflow`, amount =
   |inflow| − |outflow|; both empty is an error.
 - **`skipWhen`.** An entry skips a row when all of its given tests hold (`notEquals` and
   `matches`); an entry with neither never skips. `matches` is case-insensitive.

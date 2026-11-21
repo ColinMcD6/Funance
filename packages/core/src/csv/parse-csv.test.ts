@@ -354,6 +354,45 @@ describe('parseCsv', () => {
     ]);
   });
 
+  it('counts a CRLF inside a quoted cell as one line', () => {
+    const csv = 'Date,Desc,Amount\r\n2026-10-01,"two\r\nlines",1\r\n2026-10-02,next,2\r\n';
+    const rows = parseCsv(ascii(csv), BASE, OWNER);
+    expect(rows.map((r) => r.status === 'parsed' && [r.line, r.description])).toEqual([
+      [2, 'two lines'],
+      [4, 'next'],
+    ]);
+  });
+
+  it('loses no row after bad quoting that follows a CRLF inside a quoted cell', () => {
+    const csv =
+      'Date,Desc,Amount\r\n2026-10-01,"a\nb","1"\r\n2026-10-02,"c\r\nd",2\r\n' +
+      '2026-10-03,"bad"x,3\r\n2026-10-04,e,4\r\n2026-10-05,f,5\r\n';
+    const rows = parseCsv(ascii(csv), BASE, OWNER);
+    expect(rows.map((r) => [r.line, r.status])).toEqual([
+      [2, 'parsed'],
+      [4, 'parsed'],
+      [6, 'error'],
+      [7, 'parsed'],
+      [8, 'parsed'],
+    ]);
+  });
+
+  it('numbers lines correctly after multi-byte UTF-8 text', () => {
+    const csv =
+      'Date,Desc,Amount\n2026-10-01,"Café\nCrème",1\n2026-10-02,"bad"x,2\n2026-10-03,ok,3\n';
+    // UTF-8 bytes via percent-encoding: core has no TextEncoder type.
+    const bytes = Uint8Array.from(encodeURIComponent(csv).match(/%[0-9A-F]{2}|[^%]/g) ?? [], (t) =>
+      t.length === 3 ? parseInt(t.slice(1), 16) : t.charCodeAt(0),
+    );
+    expect(bytes.length).toBeGreaterThan(csv.length);
+    const rows = parseCsv(bytes, BASE, OWNER);
+    expect(rows.map((r) => [r.line, r.status])).toEqual([
+      [2, 'parsed'],
+      [4, 'error'],
+      [5, 'parsed'],
+    ]);
+  });
+
   it('reads headerless files by 1-based column number', () => {
     const mapping: CsvMapping = {
       ...BASE,

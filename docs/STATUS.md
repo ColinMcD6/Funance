@@ -143,7 +143,18 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
   zero-amount marker) and 10 duplicates; four identical rows against two existing give two new:
   `csv-engine.test.ts` ("occurrences") and `occurrences.test.ts`.
 - `packages/core` line coverage 98.95% (threshold 90%).
-- `pnpm check:all` passes: 266 Vitest tests, 4 Playwright tests.
+- `pnpm check:all` passes: 280 Vitest tests, 4 Playwright tests.
+
+### Review fixes
+
+- Line numbers drifted by one per CRLF inside a quoted cell (csv-parse's `lines` counts it twice),
+  and a malformed record after one made the parser restart a line late, dropping a valid row
+  silently. Line numbers now come from byte positions. Tests: `parse-csv.test.ts` ("counts a CRLF
+  inside a quoted cell as one line", "loses no row after bad quoting...", "numbers lines
+  correctly after multi-byte UTF-8 text").
+- `parseAmountCents` removed every comma, so a decimal comma (`12,34`) read as $1,234.00. Commas
+  are now accepted only as thousands separators; anything else is an error. Tests:
+  `amount.test.ts`.
 
 ### Deviations
 

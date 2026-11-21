@@ -42,6 +42,24 @@ describe('parseAmountCents', () => {
     },
   );
 
+  it.each([
+    ['1,234.56', 123456],
+    ['$12,345,678.90', 1234567890],
+    ['-1,000', -100000],
+    ['(1,200.00)', -120000],
+  ])('accepts thousands commas in groups of three: %j', (text, cents) => {
+    expect(parseAmountCents(text)).toEqual({ kind: 'ok', cents });
+  });
+
+  it.each(['12,34', '45,10 $', '1,2,3', '1,23.00', ',123', '1234,567', '1,234,56'])(
+    'rejects a comma that is not a thousands separator: %j',
+    (text) => {
+      const result = parseAmountCents(text);
+      expect(result.kind).toBe('invalid');
+      expect(result.kind === 'invalid' && result.reason).toContain(text.trim());
+    },
+  );
+
   it('rejects amounts beyond safe integer cents', () => {
     expect(parseAmountCents('99999999999999999').kind).toBe('invalid');
   });
