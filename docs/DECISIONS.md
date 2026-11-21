@@ -280,3 +280,48 @@ No contract change: `packages/shared` and `db/schema.ts` are untouched.
   reports and counts all read.
 - Category names in the preview come from `GET /categories` (M6), requested only when a row has a
   rule category, so nothing calls that route until M6 lands.
+
+## 2026-11-21 · M5
+
+No contract change and no new dependency.
+
+### API
+
+- **`GET /categories` arrives in M5, read-only.** The Transactions page needs the category list
+  for its filter and pickers, and M6 (which owns categories) depends on M5. M5 adds
+  `routes/categories.ts` and `services/categories.ts` with the list only, in `sortOrder` then id
+  order, archived categories included; M6 adds create, edit and archive to the same files.
+- **`minCents` and `maxCents` compare the signed amount**, inclusive, as stored: spending is
+  negative, so `minCents=-10000&maxCents=-2000` finds purchases of $20 to $100. The page labels
+  the fields "Min amount" and "Max amount" in signed dollars.
+- **Search** (`q`) matches description, memo and notes as a substring with `instr`, so `%` and `_`
+  are plain characters. Case folding is SQLite's `lower`, which folds ASCII letters only.
+- **Sort ties** fall back to the id in the same direction, so pages never overlap or skip rows.
+  `description` sorts with `collate nocase`.
+- **Category edits.** Setting a `categoryId` records `categorySource` (`manual` unless the client
+  sends `suggestion`) and clears `ruleId`; setting it to null clears both. A `categorySource`
+  without a non-null `categoryId` is 400. An unknown owner or category is 400
+  `invalid_reference`. An archived category is 400 `archived_category` unless every target row
+  already has it, matching "archived categories cannot be newly assigned".
+- **Unchanged rows keep their `updatedAt`**: a patch that changes nothing on a row does not touch
+  it. Bulk returns `changed` = rows whose values actually changed; repeated ids count once.
+- **Bulk is all or nothing**: any missing id is 404 with the missing ids in `details`, and no row
+  changes.
+- **`suggestedCategoryId`** is not returned yet; M7 adds it to `category=none` lists.
+- Transaction edits do not need a profile: nothing records who edited.
+
+### Web
+
+- **TanStack Table was not added.** Sorting and paging happen on the server, so the table is a
+  plain `<table>` with sortable header buttons (`aria-sort`); nothing a table library would do is
+  left on the client.
+- **The whole query lives in the URL**, with API defaults left out (`/transactions?q=uber&sort=amount`).
+  Invalid values in a URL are dropped rather than reported. Any change but the page goes back to
+  page 1. The selection belongs to one URL and clears when it changes.
+- **Filters**: selects and dates apply at once; search and the amount range apply together on
+  Enter or Apply. On phones, where the table headers are hidden, a Sort select replaces them.
+- **Inline edits are optimistic**: the cached lists show the change at once, roll back on error,
+  and every query refetches when the request settles (edits change lists, counts and, later,
+  reports).
+- Bulk actions: set owner, set category (or Uncategorized), exclude, include. Notes are editable
+  through the API but have no editor on the page yet.
