@@ -11,6 +11,8 @@ import { csvPresetRoutes } from './routes/csv-presets.js';
 import { importRoutes } from './routes/imports.js';
 import { ownerRoutes } from './routes/owners.js';
 import { sessionRoutes } from './routes/session.js';
+import { transactionRoutes } from './routes/transactions.js';
+import { categoryRoutes } from './routes/categories.js';
 import { noopRuleEngine, type RuleEngine } from './services/rule-engine.js';
 
 export type AppOptions = {
@@ -40,6 +42,8 @@ export function createApp(options: AppOptions): Hono {
   api.route('/accounts', accountRoutes(db, clock));
   api.route('/csv-presets', csvPresetRoutes());
   api.route('/imports', importRoutes(db, clock, ruleEngine));
+  api.route('/transactions', transactionRoutes(db, clock));
+  api.route('/categories', categoryRoutes(db));
 
   app.route('/api', api);
 
