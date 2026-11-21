@@ -276,18 +276,26 @@ describe('POST /api/imports/:id/commit', () => {
       expected.map((r) => [r.date, r.amountCents, r.description, r.dedupKey, r.occurrence]),
     );
     const account = await accountId('Tangerine Chequing');
+    // The seeded "Credit Card Payment" rule (M6) categorizes the one card payment row.
+    const cardPayment = ctx.db
+      .select()
+      .from(categories)
+      .where(eq(categories.name, 'Card Payment'))
+      .get();
     for (const t of stored) {
+      const isCardPayment = t.description.startsWith('Credit Card Payment');
       expect(t).toMatchObject({
         accountId: account,
         ownerId: 1,
-        categoryId: null,
-        categorySource: null,
-        ruleId: null,
+        categoryId: isCardPayment ? cardPayment?.id : null,
+        categorySource: isCardPayment ? 'rule' : null,
+        ruleId: isCardPayment ? 3 : null,
         excluded: false,
         notes: null,
         createdAt: TEST_NOW,
       });
     }
+    expect(stored.filter((t) => t.categorySource === 'rule')).toHaveLength(1);
     expect(stored[0]?.rawRow).toEqual(expected[0]?.raw);
   });
 

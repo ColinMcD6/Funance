@@ -13,7 +13,8 @@ import { ownerRoutes } from './routes/owners.js';
 import { sessionRoutes } from './routes/session.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { categoryRoutes } from './routes/categories.js';
-import { noopRuleEngine, type RuleEngine } from './services/rule-engine.js';
+import { ruleRoutes } from './routes/rules.js';
+import { databaseRuleEngine, type RuleEngine } from './services/rule-engine.js';
 
 export type AppOptions = {
   version: string;
@@ -21,7 +22,7 @@ export type AppOptions = {
   db: Db;
   /** Source of timestamps; tests inject a fixed clock. */
   clock?: Clock;
-  /** Categorizes imported rows; a no-op until M6 provides the rule engine. */
+  /** Categorizes imported rows; defaults to the database's rules. */
   ruleEngine?: RuleEngine;
   /** Directory holding the built web app; when absent, only the API is served. */
   staticDir?: string;
@@ -29,7 +30,7 @@ export type AppOptions = {
 
 /** Builds the Hono app. Tests call `app.request()` on it without opening a port. */
 export function createApp(options: AppOptions): Hono {
-  const { db, clock = systemClock, ruleEngine = noopRuleEngine } = options;
+  const { db, clock = systemClock, ruleEngine = databaseRuleEngine } = options;
   const app = new Hono();
   const api = new Hono();
 
@@ -43,7 +44,8 @@ export function createApp(options: AppOptions): Hono {
   api.route('/csv-presets', csvPresetRoutes());
   api.route('/imports', importRoutes(db, clock, ruleEngine));
   api.route('/transactions', transactionRoutes(db, clock));
-  api.route('/categories', categoryRoutes(db));
+  api.route('/categories', categoryRoutes(db, clock));
+  api.route('/rules', ruleRoutes(db, clock));
 
   app.route('/api', api);
 
