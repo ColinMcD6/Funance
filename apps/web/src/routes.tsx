@@ -6,11 +6,12 @@ import { PlaceholderPage } from '@/pages/placeholder/placeholder-page';
 import { AccountFormPage } from '@/pages/settings/account-form-page';
 import { LegacyImportPage } from '@/pages/settings/legacy-import-page';
 import { SettingsPage } from '@/pages/settings/settings-page';
+import { TransactionsPage } from '@/pages/transactions/transactions-page';
 
 /** Pages inside the app shell. Append-only: one line per page; later milestones replace placeholders. */
 export const PAGE_ROUTES: RouteObject[] = [
   { index: true, element: <PlaceholderPage title="Dashboard" milestone="M8" /> },
-  { path: 'transactions', element: <PlaceholderPage title="Transactions" milestone="M5" /> },
+  { path: 'transactions', element: <TransactionsPage /> },
   { path: 'uncategorized', element: <PlaceholderPage title="Uncategorized" milestone="M7" /> },
   { path: 'import', element: <ImportPage /> },
   { path: 'rules', element: <PlaceholderPage title="Rules" milestone="M6" /> },

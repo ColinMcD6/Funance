@@ -10,8 +10,8 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M2 CSV engine                        | Done              |
 | M3 App shell, profiles, accounts     | Done              |
 | M4 Import flow                       | Done, awaiting H2 |
+| M5 Transaction list and editing      | Done              |
 | ML Legacy spreadsheet import         | Done, awaiting H2 |
-| M5                                   | Next              |
 | M6 to M10                            | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
@@ -309,6 +309,69 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 - M10: take a backup after `commitImport`.
 - The web bundle is 540 kB (Vite warns above 500 kB); lazy routes can wait until M8.
 
+## M5: Transaction list and editing (2026-11-21, branch `m5-transactions`)
+
+### Built
+
+- `apps/server/src/services/transactions.ts` and `routes/transactions.ts`:
+  - `GET /transactions` with every filter (`owner`, `account` id or `none`, `category` id or
+    `none`, `from`, `to`, `q` over description, memo and notes, `minCents`, `maxCents`,
+    `excluded`), every sort (`date`, `amount`, `description`, either order, ties by id) and
+    pagination, returning `{ items, total }`.
+  - `PATCH /transactions/:id` (owner, category, notes, excluded; a category set here records
+    `category_source = manual`, or `suggestion` when asked) and `POST /transactions/bulk`
+    (all or nothing, returns how many rows changed).
+- `GET /categories` (read-only list, `routes/categories.ts`, `services/categories.ts`); M6 adds
+  the rest of the categories routes to these files.
+- Web (`apps/web/src/pages/transactions`): the Transactions page with a filter bar (search,
+  amount range, owner, account including None, category including Uncategorized, date range,
+  included/excluded), sortable column headers (a Sort select on phones), pagination with page
+  size, inline owner and category selects, row selection with select-all and bulk actions (set
+  owner, set category, exclude, include). Filters, sort and page live in the URL. A table at
+  768 px and wider, cards below. Query hooks `useTransactions`, `useUpdateTransaction`,
+  `useBulkUpdateTransactions` with optimistic edits.
+
+### Acceptance
+
+- Integration tests for each filter alone (15 cases, including `account=none`,
+  `category=none`, search in each of the three fields and case-insensitivity), three
+  combinations, each sort in both orders, and pagination boundaries (full first page, partial
+  last page, past the last page, page size 1 across ties, page size 500, 400 for 0 and 501):
+  `apps/server/src/routes/transactions.test.ts` ("GET /api/transactions filters", "sorting",
+  "pagination").
+- Setting a category through the API records `category_source = manual`: `transactions.test.ts`
+  ("records category_source manual when a category is set, and clears the rule", and the bulk
+  test "categorizes several rows by hand and returns how many changed").
+- Playwright: search for a merchant, sort by amount, change one row's owner, bulk-categorize three
+  rows, reload, and see all changes kept (checked in the page and through the API):
+  `e2e/transactions.spec.ts`, desktop and 390 px.
+- Also tested: PATCH and bulk validation (404, unknown owner or category, archived category,
+  `categorySource` without a category, bad JSON), unchanged rows keep `updatedAt`, totals against
+  `seed:demo` data; web component tests in `pages/transactions/transactions.test.tsx` and URL and
+  dollar parsing in `transaction-filters.test.ts`.
+- M4 follow-up done: `e2e/import.spec.ts` now also counts the account's rows through
+  `GET /transactions?account=` after commit (38) and after undo (0).
+- `pnpm check:all` passes: 480 Vitest tests, 18 Playwright tests.
+
+### Deviations
+
+- No contract change, no new dependency.
+- `GET /categories` was built here (read-only) because the page needs it and M6 comes after M5.
+- TanStack Table was not added: sorting and paging are server-side, so a plain table does it.
+- Shared files touched beyond the milestone's area: `apps/server/src/app.ts` and
+  `apps/web/src/routes.tsx` (append-only lines), `apps/web/src/api/queries.ts` (new hooks),
+  `e2e/import.spec.ts` (the M4 follow-up check).
+- Details in DECISIONS.md under M5.
+
+### Follow-ups
+
+- M6: add POST, PATCH and DELETE to `routes/categories.ts` and `services/categories.ts`.
+- M7: return `suggestedCategoryId` from `listTransactions` when `category=none`; send
+  `categorySource: 'suggestion'` when a suggestion is accepted (the API already records it).
+- M8: link chart and table clicks to `/transactions?category=…&from=…&to=…&owner=…`.
+- M10 mobile pass: on phones the filter bar fills the first screen; consider folding it behind a
+  "Filters" button. Notes have no editor on the page yet (the API supports them).
+
 ## ML: Legacy spreadsheet import (2026-11-21, branch `ml-legacy-import`)
 
 ### Built
@@ -358,18 +421,19 @@ owners)` with exceljs. Enforces every rule of the PLAN.md format specification, 
 - **Not met: "Reports include legacy rows under every owner filter".** The reports are M8's and
   do not exist yet. M8 must add this test.
 - Playwright: `e2e/legacy-import.spec.ts` uploads the valid fixture in Settings, commits, sees
-  account "None" on the result page and in Import history, checks the rows exist with no account
-  through the API, and undoes. **Partly met:** it cannot filter **Transactions** by **Account:
-  None**, because that page is M5's. The invalid workbook's 20 problems and the disabled Commit
-  are checked on both projects.
-- `pnpm check:all` passes: 436 Vitest tests, 19 Playwright tests (1 skipped, see below).
+  account "None" on the result page, opens **Transactions** filtered by **Account: None** (60
+  rows; a search finds the two Tim Hortons rows, each with account "None"), sees "None" in Import
+  history, undoes, and checks `GET /transactions?account=none` is empty. The invalid workbook's
+  20 problems and the disabled Commit are checked on both projects.
+- `pnpm check:all` passes after merging M5: 540 Vitest tests, 21 Playwright tests (1 skipped, see
+  below).
 
 ### Deviations
 
 - Contract note, no shape change: a legacy import's `raw_csv` holds the workbook as base64
   (the M1 comment said empty). Separate first commit; details in DECISIONS.md under ML.
-- `account=none` on `GET /transactions` and "None" in the transaction list and filter are
-  not built: they belong to M5's route and page, which do not exist yet.
+- `account=none` on `GET /transactions` and the **Account: None** filter come from M5 (merged
+  into this branch before the e2e check was added).
 - The legacy commit journey runs in the desktop Playwright project only. Both projects share one
   database and only one legacy import can be committed at a time, so running it twice in
   parallel would make one fail with 409.
@@ -381,9 +445,6 @@ owners)` with exceljs. Enforces every rule of the PLAN.md format specification, 
 
 ### Follow-ups
 
-- M5: support `account=none` in `GET /transactions`, show "None" for a missing account in the
-  list and offer **Account: None** in the account filter; extend `e2e/legacy-import.spec.ts` to
-  open Transactions filtered by Account: None and find a legacy row.
 - M8: a test that reports include legacy rows under every owner filter (Colin, Emily, Joint, all).
 - H2: once the real workbook conforms, expect 13 month sheets, 799 rows, zero violations, and
   compare each month's sheet total with the workbook.
