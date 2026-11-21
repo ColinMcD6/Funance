@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@funance/shared": "workspace:*"
+    "@funance/shared": "workspace:*",
+    "csv-parse": "^7.0.3"
   }
 }
