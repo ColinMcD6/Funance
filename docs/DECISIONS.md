@@ -280,3 +280,90 @@ No contract change: `packages/shared` and `db/schema.ts` are untouched.
   reports and counts all read.
 - Category names in the preview come from `GET /categories` (M6), requested only when a row has a
   rule category, so nothing calls that route until M6 lands.
+
+## 2026-11-21 · ML
+
+### Contract note: a legacy import stores its workbook
+
+`imports.raw_csv` of a legacy import holds the uploaded `.xlsx` **base64-encoded**, not an empty
+string as the M1 note said. Commit must re-read the workbook (as a CSV commit re-reads its file),
+and PLAN.md says `raw_csv` is "kept for audit and re-parsing". The column stays `text` and the
+Zod type stays `z.string()`, so no migration and no shape change: only the doc comment on
+`importSchema.rawCsv` in `packages/shared/src/entities.ts` changes (separate first commit). The
+real workbook is about 50 kB, so about 70 kB of text.
+
+### Dependencies
+
+| Package         | Where    | Why                                                                                                         |
+| --------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `exceljs` 4.4.0 | core     | Reads the legacy workbook, as PLAN.md milestone ML specifies. Loaded from bytes only: no filesystem in core |
+| `exceljs` 4.4.0 | root dev | `fixtures/legacy/generate.ts` writes the synthetic workbooks; tests import it                               |
+
+exceljs is bundled into the server by esbuild (the server bundle is now 3.3 MB).
+The web app never imports it (the `@funance/core` root import is already forbidden there).
+
+### How the legacy importer works
+
+- **`parseLegacyWorkbook(bytes, categories, owners)`** (`packages/core/src/legacy`) is async
+  (exceljs loads asynchronously) and never throws on input. It returns `rows` (one per transaction
+  row: `parsed`, the `ParsedOkRow` shape plus `sheet`, `categoryId` and `occurrence`, or `error`
+  with every message joined), `violations` (one per broken rule) and `monthTotals`.
+- **Rule ids** (`LEGACY_RULES`): `file-format`, `no-month-sheets`, `sheet-name`, `hidden-sheet`,
+  `header`, `blank-row`, `merged-cells`, `formula`, `required`, `date-type`, `date-month`,
+  `date-time`, `description-type`, `description-length`, `description-line-break`,
+  `description-spaces`, `amount-type`, `amount-zero`, `amount-decimals`, `category-name`,
+  `owner-name`, `income-sign`. "Each month at most once" needs no rule: Excel forbids two sheets
+  with the same name, and `MM-YYYY` gives each month exactly one name.
+- **One problem, one violation.** A formula or empty cell is reported once (`formula` or
+  `required`) and its other checks are skipped; a row with a merged cell in A to E is one
+  `merged-cells` violation and is not checked further. Checks within a column stop at the first
+  failure, so a planted violation never produces a second one.
+- **Amounts** are converted from the cell's number through its shortest decimal text
+  (`String(54.46)`), so `54.463` is an `amount-decimals` violation and no floating-point maths is
+  done on money.
+- **Dates** are the cell's Excel date read in UTC (exceljs's convention); any time of day is a
+  violation.
+- **Descriptions** may be plain or rich text; inner runs of whitespace are collapsed, as CSV
+  descriptions are.
+- **Blank rows**: a row is blank when A to E are all empty. Blank rows after the last transaction
+  are allowed (column F may still hold formulas there); a blank row before it is a violation.
+- **Allowed names** are the active categories whose kind is not `transfer` (the sheet never had
+  Card Payment or Transfer) and every owner, both matched exactly. `income-sign` applies to any
+  `income`-kind category.
+- **Month totals** count every transaction row of a month sheet and sum the amounts that could be
+  read, as the sheet records them (spending positive), so they can be compared with the sheet
+  even while some rows have problems.
+- **`line`** of a legacy preview row is its sheet row; the sheet is in `raw.sheet`, and the web
+  app labels rows "07-2026 row 5". Identical rows get occurrences 1, 2, ... within the workbook.
+
+### API
+
+- `POST /imports/legacy/preview` needs a profile (401) and a file named `.xlsx` (400 `not_xlsx`,
+  which also covers `.xls`, `.xlsm` and `.csv`). Violations do not fail the request: it answers
+  201 with them listed, and an unreadable file is a `file-format` violation. 409
+  `legacy_already_committed` while a legacy import is committed.
+- `POST /imports/:id/commit` looks up the import's kind and sends a legacy import to
+  `commitLegacyImport`, which parses the stored workbook again with the categories and owners as
+  they are then. 409 `legacy_has_errors` while it has violations, 409 `legacy_already_committed`
+  when another legacy import is committed, 409 `not_a_preview` as for CSV. A non-empty
+  `skipLines` is 400 `skip_lines_not_supported`: legacy rows are fixed in the workbook, not
+  unticked.
+- Legacy rows get `account_id` null, `category_source = manual`, no rule, no posted date, memo,
+  bank category or external id; `dedup_key` follows the PLAN.md formula. Undo is unchanged.
+
+### CSV preview
+
+- Every `new` row has an include checkbox, ticked by default; unticked lines go to commit as
+  `skipLines`, and the Commit button counts only the ticked rows.
+- When `legacyOverlapMonths` is not empty, a note names the months and asks the uploader to
+  untick rows the spreadsheet already recorded. No matching is done.
+
+### Not built here (depends on unbuilt milestones)
+
+- `account=none` on `GET /transactions` and "None" in the transaction list and its account filter:
+  the route and page are M5's, not built yet. The query schema already accepts `none`.
+- "Reports include legacy rows under every owner filter": the reports are M8's.
+- The Playwright journey cannot open **Transactions** with **Account: None** yet, so it checks
+  the rows through the API instead (a September statement's preview reports `2026-09` in
+  `legacyOverlapMonths`, which reads rows with no account) and sees "None" on the result page
+  and in Import history.

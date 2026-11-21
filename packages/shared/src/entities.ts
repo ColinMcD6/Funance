@@ -76,7 +76,7 @@ export const importSchema = z.object({
   accountId: idSchema.nullable(),
   filename: z.string().min(1),
   fileSha256: z.string().regex(/^[0-9a-f]{64}$/),
-  /** Original file content (for a legacy import, empty: the workbook is binary). */
+  /** Original file content (for a legacy import, the .xlsx workbook encoded as base64). */
   rawCsv: z.string(),
   status: importStatusSchema,
   uploadedByOwnerId: idSchema,
