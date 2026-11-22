@@ -583,7 +583,16 @@ Built before M7, which it does not depend on.
 - Also: the M5/ML follow-up "reports include legacy rows under every owner filter" ("legacy rows
   count under every owner filter, like statement rows"); web tests in
   `pages/reports/report-view.test.ts` and `pages/reports/reports.test.tsx`.
-- `pnpm check:all` passes: 717 Vitest tests, 27 Playwright tests (1 skipped, as before).
+- `pnpm check:all` passes: 718 Vitest tests, 27 Playwright tests (1 skipped, as before).
+
+### Review fixes
+
+- Trends by major category dropped the spending of a mixed group whose first category is not an
+  expense: `spendingTrend` filtered on the group's kind, which is its first category's, so Money
+  (Investing first in the seed) lost its Debt Payments. `spendingCents` already holds only
+  expense and uncategorized amounts, so the kind filter is gone. Test:
+  `report-view.test.ts` ("keeps the spending of a mixed major category whose first category is
+  not an expense").
 
 ### Deviations
 

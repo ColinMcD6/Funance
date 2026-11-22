@@ -217,9 +217,10 @@ export function spendingTrend(
   const buckets = new Map<string, Bucket>();
   const cents = new Map<string, number>();
   for (const row of rows) {
+    // spendingCents already holds only expense and uncategorized amounts, so no kind check here:
+    // a major category's kind is its first category's, which says nothing about a mixed group.
     if (row.spendingCents === 0) continue;
     const bucket = bucketOf(row, categories);
-    if (bucket.kind !== 'expense' && bucket.kind !== null) continue;
     buckets.set(bucket.key, bucket);
     const key = `${row.month}|${bucket.key}`;
     cents.set(key, (cents.get(key) ?? 0) + row.spendingCents);

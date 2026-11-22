@@ -171,6 +171,26 @@ describe('spendingTrend', () => {
       { month: '2026-10', c1: 900, c3: 0, none: 50 },
     ]);
   });
+
+  it('keeps the spending of a mixed major category whose first category is not an expense', () => {
+    // Money's first category is Income; its Debt Payments spending must still be charted.
+    const { points, buckets } = spendingTrend(
+      [
+        row({ month: '2026-10', groupName: 'Joy', spendingCents: 400 }),
+        row({
+          month: '2026-10',
+          groupName: 'Money',
+          spendingCents: 20000,
+          incomeCents: 500000,
+          savedCents: 50000,
+        }),
+      ],
+      ['2026-10'],
+      CATEGORIES,
+    );
+    expect(buckets.map((b) => b.label)).toEqual(['Joy', 'Money']);
+    expect(points).toEqual([{ month: '2026-10', gJoy: 400, gMoney: 20000 }]);
+  });
 });
 
 describe('compareLines', () => {
