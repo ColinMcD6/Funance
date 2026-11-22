@@ -15,7 +15,8 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M6 Categories and rules              | Done              |
 | M7 Uncategorized queue               | Not started       |
 | M8 Reports and dashboard             | Done, awaiting H3 |
-| M9, M10                              | Not started       |
+| M9 Budgets                           | Done              |
+| M10                                  | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -622,3 +623,70 @@ Built before M7, which it does not depend on.
   603 kB (warning above 500 kB, as before M8).
 - The M8 PLAN.md review step (a second agent session reviewing the report maths) is for you to
   start.
+
+## M9: Budgets (2026-11-22, branch `m9-budgets`)
+
+### Built
+
+- `packages/core/src/budgets.ts` (new export `@funance/core/budgets`): `effectiveBudget` (latest
+  row at or before a month, per category and owner), `budgetForView` (one owner: their own budget;
+  All: the household budget, else the sum of the owners' budgets), `budgetStatus` (actual minus
+  budget, percent used) and `duplicateBudget`.
+- Server: `services/budgets.ts` and `routes/budgets.ts`. `GET /budgets` lists every row;
+  `PUT /budgets` replaces them all in one transaction, after checking categories, owners, no
+  transfer category and no duplicate category, owner and month (400 otherwise, nothing changed).
+- Web:
+  - **Settings → Budgets** (`pages/budgets`, route `/settings/budgets`, linked from a new Budgets
+    section on Settings): edit every row as a draft (category, Household or an owner, from month,
+    monthly amount), add and remove rows, save with one PUT or discard. Rows in effect this month
+    are marked. Problems (missing or negative amount, duplicate) point at their row.
+  - **Dashboard:** each row of the comparison table with a budget shows a bar and the signed
+    amount against it under the category name, e.g. `+$20.00 over of $100.00` or
+    `-$20.00 under of $50.00`. The budget follows the owner switch and the month. In major-category
+    mode a group adds up its categories' budgets within the section.
+- `pnpm seed:demo` writes five demo budgets.
+
+### Acceptance
+
+- Effective-from lookup: `packages/core/src/budgets.test.ts` ("effectiveBudget": before the first
+  row, from a row's own month, the latest row until a later one, across a year boundary) and, on
+  rows stored through the API, `apps/server/src/routes/budgets.test.ts` ("applies the latest row
+  at or before a month, per owner and for the household").
+- Household versus per-owner budgets: `budgets.test.ts` in core ("budgetForView": one owner uses
+  only their own; All uses the household budget, else the sum of the owners'; falls back to owners
+  before a household row starts), the same server test, and `pages/reports/budget-view.test.ts`.
+- The indicator shows the correct sign and amount for seeded data:
+  - Playwright `e2e/budgets.spec.ts` seeds a month through the API (own category, account and year)
+    and checks `+$10.00 over of $150.00` (All, household budget from the 2014-03 row, not the
+    2014-01 or 2015-04 ones), `+$20.00 over of $100.00` (Colin), `-$20.00 under of $50.00` (Emily),
+    none for Joint; then adds a Joint budget in Settings → Budgets and sees `-$5.00 under of $15.00`;
+    April shows the $1 household row; and at 390 px the indicator shows with no horizontal scroll.
+  - Component tests in `pages/reports/reports.test.tsx` ("Dashboard budgets": over, under, owner
+    switch, none before the budget starts, colours).
+- Also: API validation tests in `routes/budgets.test.ts`; Budgets page tests in
+  `pages/budgets/budgets.test.tsx` and `budget-draft.test.ts`; the demo seed test counts budgets.
+- `pnpm check:all` passes: 771 Vitest tests, 28 Playwright tests (2 skipped: the legacy commit
+  journey and the budgets spec each run in the desktop project only).
+
+### Deviations
+
+- No contract change, no new dependency. Choices are in DECISIONS.md under M9.
+- The indicator sits under the category name, not in a new column as the M8 follow-up suggested,
+  so it fits a phone.
+- Two test fixes outside the milestone's area, neither changing an assertion:
+  `e2e/legacy-import.spec.ts` (the invalid-workbook test retries its preview while the other
+  legacy test holds a committed import; a race that was already there, which the new spec's
+  worker schedule exposed) and `pages/reports/reports.test.tsx` (preloads the lazy chart modules,
+  whose first import could pass the 5 s timeout under the full suite).
+- Shared files touched: `apps/server/src/app.ts` (route line), `apps/web/src/routes.tsx` (route),
+  `api/queries.ts` (two hooks), `pages/settings/settings-page.tsx` (section),
+  `pages/reports/compare-table.tsx` and `dashboard-page.tsx` (indicator),
+  `packages/core/src/index.ts` and `package.json` (exports), `db/demo-seed*.ts` (demo budgets).
+
+### Follow-ups
+
+- A budgeted category with no transactions in the month or the comparison months has no table row,
+  so its unspent budget is not shown.
+- The budgets page saves every row with one PUT; two people saving at once would overwrite each
+  other (last save wins). That is acceptable for one household; a per-row API would be a contract
+  change.

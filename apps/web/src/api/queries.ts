@@ -2,6 +2,7 @@ import type {
   CommitImportRequest,
   CompareReportQuery,
   MonthlyReportQuery,
+  PutBudgetsRequest,
   CreateAccountRequest,
   CreateCategoryRequest,
   RuleInput,
@@ -29,6 +30,8 @@ import {
   createRule,
   deleteRule,
   getCompareReport,
+  listBudgets,
+  putBudgets,
   getMonthlyReport,
   getImport,
   getHealth,
@@ -66,6 +69,7 @@ export const queryKeys = {
   transactionList: (query: TransactionQuery) => ['transactions', query] as const,
   monthlyReport: (query: MonthlyReportQuery) => ['reports', 'monthly', query] as const,
   compareReport: (query: CompareReportQuery) => ['reports', 'compare', query] as const,
+  budgets: ['budgets'],
 } as const;
 
 export function useHealth() {
@@ -333,5 +337,22 @@ export function useCompareReport(query: CompareReportQuery) {
     queryKey: queryKeys.compareReport(query),
     queryFn: () => getCompareReport(query),
     placeholderData: keepPreviousData,
+  });
+}
+
+// ---- Budgets (M9) ----
+
+export function useBudgets() {
+  return useQuery({ queryKey: queryKeys.budgets, queryFn: listBudgets });
+}
+
+/** PUT /budgets replaces every row; the cache takes the saved list from the response. */
+export function usePutBudgets() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (budgets: PutBudgetsRequest['budgets']) => putBudgets(budgets),
+    onSuccess: (saved) => {
+      client.setQueryData(queryKeys.budgets, saved);
+    },
   });
 }

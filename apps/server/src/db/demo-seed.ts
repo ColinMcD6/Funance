@@ -3,7 +3,7 @@ import type { CategorySource } from '@funance/shared';
 import { count } from 'drizzle-orm';
 import type { Clock } from '../clock.js';
 import type { Db } from './migrate.js';
-import { accounts, categories, imports, rules, transactions } from './schema.js';
+import { accounts, budgets, categories, imports, owners, rules, transactions } from './schema.js';
 
 // Synthetic data for UI work and report tests (`pnpm seed:demo`). Every value comes from a seeded
 // pseudo-random generator and a fixed month range, so two runs produce identical databases.
@@ -337,7 +337,26 @@ export type DemoSeedSummary = {
   transactions: number;
   categorized: number;
   totalCents: number;
+  budgets: number;
 };
+
+/**
+ * Demo budgets (M9), so the dashboard shows over and under indicators: a household Groceries
+ * budget raised part way through, a household Eating out budget, and per-owner Coffee budgets
+ * with no household one (the All view adds them up).
+ */
+export const DEMO_BUDGETS: readonly {
+  category: string;
+  owner: string | null;
+  monthlyAmountCents: number;
+  effectiveFrom: string;
+}[] = [
+  { category: 'Groceries', owner: null, monthlyAmountCents: 60000, effectiveFrom: '2025-09' },
+  { category: 'Groceries', owner: null, monthlyAmountCents: 70000, effectiveFrom: '2026-06' },
+  { category: 'Eating out', owner: null, monthlyAmountCents: 15000, effectiveFrom: '2025-09' },
+  { category: 'Coffee', owner: 'Colin', monthlyAmountCents: 3000, effectiveFrom: '2025-09' },
+  { category: 'Coffee', owner: 'Emily', monthlyAmountCents: 3000, effectiveFrom: '2025-09' },
+];
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
@@ -380,7 +399,13 @@ export function seedDemo(db: Db, options: DemoSeedOptions): DemoSeedSummary {
     const ruleRows = tx.select().from(rules).all();
     const accountRows = tx.select().from(accounts).orderBy(accounts.id).all();
 
-    const summary: DemoSeedSummary = { imports: 0, transactions: 0, categorized: 0, totalCents: 0 };
+    const summary: DemoSeedSummary = {
+      imports: 0,
+      transactions: 0,
+      categorized: 0,
+      totalCents: 0,
+      budgets: 0,
+    };
 
     for (const account of accountRows) {
       const merchants = ACCOUNT_MERCHANTS[account.name];
@@ -492,6 +517,32 @@ export function seedDemo(db: Db, options: DemoSeedOptions): DemoSeedSummary {
           summary.totalCents += amountCents;
         }
       }
+    }
+
+    const ownerIds = new Map(
+      tx
+        .select({ id: owners.id, name: owners.name })
+        .from(owners)
+        .all()
+        .map((o) => [o.name, o.id]),
+    );
+    for (const budget of DEMO_BUDGETS) {
+      const categoryId = categoryIds.get(budget.category);
+      if (categoryId === undefined) throw new Error(`Unknown category ${budget.category}`);
+      let ownerId: number | null = null;
+      if (budget.owner !== null) {
+        ownerId = ownerIds.get(budget.owner) ?? null;
+        if (ownerId === null) throw new Error(`Unknown owner ${budget.owner}`);
+      }
+      tx.insert(budgets)
+        .values({
+          categoryId,
+          ownerId,
+          monthlyAmountCents: budget.monthlyAmountCents,
+          effectiveFrom: budget.effectiveFrom,
+        })
+        .run();
+      summary.budgets++;
     }
     return summary;
   });

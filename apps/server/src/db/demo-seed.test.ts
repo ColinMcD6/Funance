@@ -2,9 +2,9 @@ import { join } from 'node:path';
 import { transactionSchema } from '@funance/shared';
 import { afterAll, describe, expect, it } from 'vitest';
 import { fixedClock } from '../clock.js';
-import { DEMO_MONTHS, seedDemo } from './demo-seed.js';
+import { DEMO_BUDGETS, DEMO_MONTHS, seedDemo } from './demo-seed.js';
 import { initDatabase } from './init.js';
-import { accounts, categories, imports, transactions } from './schema.js';
+import { accounts, budgets, categories, imports, transactions } from './schema.js';
 import { dumpTables, makeTempDir } from './test-db.js';
 
 const temp = makeTempDir('funance-demo-');
@@ -52,7 +52,9 @@ describe('seedDemo', () => {
       transactions: t.n,
       categorized: t.categorized,
       totalCents: t.total,
+      budgets: DEMO_BUDGETS.length,
     });
+    expect(first.db.select().from(budgets).all()).toHaveLength(DEMO_BUDGETS.length);
   });
 
   it('covers 14 months across all 5 accounts', () => {

@@ -11,3 +11,4 @@ export * from './money.js';
 export * from './legacy/parse-legacy-workbook.js';
 export * from './rules.js';
 export * from './reports.js';
+export * from './budgets.js';
