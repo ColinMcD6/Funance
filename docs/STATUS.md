@@ -666,7 +666,20 @@ Built before M7, which it does not depend on.
   editable pattern and "Not now", group "Set all to", owner change, keyboard navigation and focus,
   empty queue (`uncategorized.test.tsx`); `queue.test.ts` for grouping, the rule pattern and the
   key mapping.
-- `pnpm check:all` passes: 755 Vitest tests, 29 Playwright tests (1 skipped, as before).
+- `pnpm check:all` passes: 756 Vitest tests, 29 Playwright tests (1 skipped, as before).
+
+### CI fix
+
+- The first CI run failed on `fixtures/expected/legacy-engine.test.ts` ("matches what the
+  generator writes"), an ML test that M7 does not touch: exceljs could not read the committed
+  `legacy-invalid.xlsx`. The cause was in `parseLegacyWorkbook`, which passed
+  `bytes.slice().buffer` to exceljs. For a Node `Buffer` (such as `readFileSync` output),
+  `slice()` does not copy and `.buffer` is the whole shared 64 KB pool, so JSZip sometimes found
+  another file's zip directory in it (about 1 load in 300 in a stress loop). It now copies
+  exactly the view's bytes (`new Uint8Array(bytes).buffer`), with 0 failures in 1,200 loads. The
+  server already copied uploads into a plain `Uint8Array`, so the running app was not affected.
+- Regression test: `packages/core/src/legacy/parse-legacy-workbook.test.ts` ("reads only the
+  bytes of a Buffer view inside a larger memory block"). It failed before the fix.
 
 ### Deviations
 
@@ -678,7 +691,8 @@ Built before M7, which it does not depend on.
   line), `components/nav-items.ts` (optional `badge` field, set on Uncategorized),
   `components/app-shell.tsx` (renders the badge), `api/queries.ts` (one hook),
   `packages/core/src/index.ts` (one export), `apps/server/src/db/test-rows.ts` (optional
-  `merchantKey` and `excluded` for test rows).
+  `merchantKey` and `excluded` for test rows), and the CI fix in
+  `packages/core/src/legacy/parse-legacy-workbook.ts`.
 
 ### Follow-ups
 
