@@ -46,7 +46,7 @@ export function AppShell() {
         aria-label="Main"
         className="bg-background fixed inset-x-0 bottom-0 z-10 border-t md:hidden"
       >
-        <ul className="grid grid-cols-7">
+        <ul className="grid grid-flow-col auto-cols-fr">
           {NAV_ITEMS.map((item) => (
             <li key={item.to} className="min-w-0">
               <NavLink

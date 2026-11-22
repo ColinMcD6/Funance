@@ -13,7 +13,9 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M5 Transaction list and editing      | Done              |
 | ML Legacy spreadsheet import         | Done, awaiting H2 |
 | M6 Categories and rules              | Done              |
-| M7 to M10                            | Not started       |
+| M7 Uncategorized queue               | Not started       |
+| M8 Reports and dashboard             | Done, awaiting H3 |
+| M9, M10                              | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -523,3 +525,91 @@ owners)` with exceljs. Enforces every rule of the PLAN.md format specification, 
 - M7: `rules/apply` returns only a count; if the prompt needs to say which rows changed, that is a
   contract change.
 - M8: reports should treat archived categories like any other (they keep their history).
+
+## M8: Reports and dashboard (2026-11-21, branch `m8-reports`)
+
+Built before M7, which it does not depend on.
+
+### Built
+
+- `packages/core/src/reports.ts` (new export `@funance/core/reports`): month arithmetic
+  (`addMonths`, `monthsBetween`, `monthDateRange`), `directedCents` (a sum in its kind's
+  direction; transfers null), `averageCents` (rounded half away from zero), `reportTotals`
+  (income, spending, saved, left over, and the uncategorized bucket apart) and
+  `buildCompareRows` (null for a month with no data, the trailing average over months with data).
+- Server: `services/reports.ts` and `routes/reports.ts`. `GET /reports/monthly` is one SQL
+  aggregate grouped by month and category (or major category), with conditional sums per kind;
+  `GET /reports/compare` aggregates the five months it needs (this month, the three before, the
+  same month last year) and assembles rows with `buildCompareRows`. Both leave out excluded rows
+  and transfer categories and filter by owner.
+- Web (`pages/reports`):
+  - **Dashboard** (`/`): month picker (previous, next, month field), owner switch (each owner and
+    All, defaulting to the active profile), Categories / Major categories switch; Income,
+    Spending, Saved and Left over cards; an uncategorized warning that links to those rows; a
+    horizontal spending breakdown chart; and a table with this month, last month, change, last
+    year, 3-month average and change against the average, in Spending, Income and Saved sections.
+    Every category name and chart bar opens Transactions filtered to that category, month and
+    owner (and not excluded).
+  - **Trends** (`/trends`, new nav item): stacked monthly spending over 12 or 24 months, and a
+    line chart with a checkbox per category (the three largest picked by default). Clicking a bar
+    segment opens that category and month in Transactions.
+  - View state lives in the URL (`month`, `owner`, `groupBy`, `span`). Recharts is added and loaded
+    lazily with the chart components.
+
+### Acceptance
+
+- Report tests against a hand-written dataset with totals worked out in the test file
+  (`apps/server/src/routes/reports.test.ts`):
+  - a refund reduces its category: "gives each category of a month its own kind total; a refund
+    reduces its category";
+  - transfers and excluded rows are absent: "leaves transfers and excluded rows out";
+  - savings count toward saved, not spending: "counts savings categories toward saved and not
+    toward spending";
+  - left over equals income minus spending minus saved: "household totals: left over equals
+    income minus spending minus saved" (and `reportTotals` in `packages/core/src/reports.test.ts`);
+  - uncategorized is its own bucket: "puts uncategorized rows in their own bucket";
+  - each owner filter matches a manual sum: "owner %i matches a manual sum" (Colin, Emily, Joint);
+  - All equals the sum of the three owners: "All equals the sum of the three owners, row by row".
+- Comparison with no prior-year data returns null, not zero: "returns null, not zero, for a month
+  with no prior-year data" (also `buildCompareRows` unit tests, and "filters by owner; a month
+  with data from another owner is zero, not null").
+- Playwright (`e2e/reports.spec.ts`, desktop and 390 px): "monthly review: switch owner, see the
+  totals change, drill into a category" switches Colin, Emily, Joint and All and checks each
+  set of totals against values written in the spec, then clicks Groceries in the table, and a
+  chart bar, and lands on a correctly filtered Transactions list (URL and row count).
+- Charts render at 390 px without overflow: the same spec and "trends: charts render and fit the
+  screen" check that each chart's SVG lies inside the viewport and the page has no horizontal
+  scroll.
+- Also: the M5/ML follow-up "reports include legacy rows under every owner filter" ("legacy rows
+  count under every owner filter, like statement rows"); web tests in
+  `pages/reports/report-view.test.ts` and `pages/reports/reports.test.tsx`.
+- `pnpm check:all` passes: 717 Vitest tests, 27 Playwright tests (1 skipped, as before).
+
+### Deviations
+
+- No contract change. New dependency `recharts` (DECISIONS.md, M8).
+- Choices where the contract left room are recorded in DECISIONS.md under M8: the uncategorized
+  bucket's amount is in `spendingCents` but outside the spending total; "a month with no data"
+  means no transaction at all in the database for that month; the trailing average divides by
+  the months that have data.
+- In Major categories mode, rows and bars are not links: Transactions cannot filter by major
+  category without a contract change.
+- The owner switch shows owner names (Colin, Emily, Joint, All) rather than "Me / Wife".
+- The Playwright data is a hand-written CSV imported into the spec's own account in 2016 to 2019,
+  so it is independent of other specs that share the e2e database; `pnpm seed:demo` is not used.
+- Shared files touched beyond the milestone's area: `apps/server/src/app.ts` (route line),
+  `apps/web/src/routes.tsx` (Dashboard replaces its placeholder; Trends route),
+  `components/nav-items.ts` (Trends), `components/app-shell.tsx` (bottom bar column count),
+  `app.test.tsx` (the nav list now includes Trends), `api/queries.ts` (two hooks),
+  `packages/core/src/index.ts` and `package.json` (exports).
+
+### Follow-ups
+
+- H3: categorize one real month and check two category totals against a manual sum.
+- A `group` filter on `GET /transactions` would let major-category rows drill down (contract
+  change).
+- M9: budget indicators can go in `CompareTable` as one more column.
+- M10: the phone bottom bar now has 8 items; review it in the responsive pass. The main bundle is
+  603 kB (warning above 500 kB, as before M8).
+- The M8 PLAN.md review step (a second agent session reviewing the report maths) is for you to
+  start.

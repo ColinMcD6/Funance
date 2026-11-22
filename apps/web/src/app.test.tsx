@@ -118,6 +118,7 @@ describe('App navigation', () => {
       'Rules',
       'Categories',
       'Settings',
+      'Trends',
     ]);
     await user.click(within(sidebar).getByRole('link', { name: 'Rules' }));
     expect(await screen.findByRole('heading', { name: 'Rules' })).toBeInTheDocument();

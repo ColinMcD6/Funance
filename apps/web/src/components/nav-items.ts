@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  TrendingUp,
   Upload,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,4 +27,5 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/rules', label: 'Rules', shortLabel: 'Rules', icon: ListChecks },
   { to: '/categories', label: 'Categories', shortLabel: 'Categories', icon: FolderTree },
   { to: '/settings', label: 'Settings', shortLabel: 'Settings', icon: Settings },
+  { to: '/trends', label: 'Trends', shortLabel: 'Trends', icon: TrendingUp },
 ];
