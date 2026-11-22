@@ -1,5 +1,7 @@
 import type {
   CommitImportRequest,
+  CompareReportQuery,
+  MonthlyReportQuery,
   CreateAccountRequest,
   CreateCategoryRequest,
   RuleInput,
@@ -26,6 +28,8 @@ import {
   createCategory,
   createRule,
   deleteRule,
+  getCompareReport,
+  getMonthlyReport,
   getImport,
   getHealth,
   listAccounts,
@@ -60,6 +64,8 @@ export const queryKeys = {
   importDetail: (id: number) => ['imports', id] as const,
   transactions: ['transactions'],
   transactionList: (query: TransactionQuery) => ['transactions', query] as const,
+  monthlyReport: (query: MonthlyReportQuery) => ['reports', 'monthly', query] as const,
+  compareReport: (query: CompareReportQuery) => ['reports', 'compare', query] as const,
 } as const;
 
 export function useHealth() {
@@ -309,5 +315,23 @@ export function useApplyRules() {
   return useMutation({
     mutationFn: () => applyRules(),
     onSuccess: () => client.invalidateQueries(),
+  });
+}
+
+/** GET /reports/monthly; the previous report stays on screen while the next one loads. */
+export function useMonthlyReport(query: MonthlyReportQuery) {
+  return useQuery({
+    queryKey: queryKeys.monthlyReport(query),
+    queryFn: () => getMonthlyReport(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** GET /reports/compare */
+export function useCompareReport(query: CompareReportQuery) {
+  return useQuery({
+    queryKey: queryKeys.compareReport(query),
+    queryFn: () => getCompareReport(query),
+    placeholderData: keepPreviousData,
   });
 }

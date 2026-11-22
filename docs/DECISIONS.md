@@ -472,3 +472,61 @@ No contract change and no new dependency.
 - The Playwright journey limits its COSTCO rule to the account it imported into, because both
   browser projects share one database and an unlimited rule would also match the other
   project's rows and change the preview count.
+
+## 2026-11-21 · M8
+
+No contract change: the report routes use the shapes M1 defined in `packages/shared/src/api.ts`.
+
+### Dependencies
+
+| Package         | Where | Why                                                                          |
+| --------------- | ----- | ---------------------------------------------------------------------------- |
+| `recharts` 3.11 | web   | Charts library from the PLAN.md stack table (Dashboard breakdown and Trends) |
+
+### Report semantics chosen where the contract left room
+
+- **Counted rows.** Reports leave out excluded rows and rows in `transfer` categories. Archived
+  categories count like any other. Legacy rows (no account) count under their owner.
+- **The uncategorized bucket** (`categoryId` and `groupName` null) reports the negated net sum
+  of its rows in `spendingCents` (outflows positive), with income and saved zero. It is not part
+  of the spending total: `reportTotals` in `packages/core/src/reports.ts` sums spending, income
+  and saved over categorized rows only and reports the uncategorized amount and count apart, so
+  left over is exactly income minus spending minus saved. The dashboard shows it as a warning
+  linking to the rows.
+- **groupBy=group** sums each kind separately inside a major category, so a mixed group such as
+  Money (Income, Investing, Debt Payments) has spending, income and saved on one row.
+- **Compare: "a month with no data".** A comparison month is null when the database has no
+  transaction at all dated in it, whatever the owner, category or excluded flag. A category with
+  no rows in a month that has data is 0. So with an owner filter, a month where only another
+  owner had transactions is 0, not null.
+- **Compare: trailing average** is the mean over those of the three previous months that have
+  data (null when none has), rounded half away from zero to whole cents. Dividing by 3 regardless
+  would understate the first months after the legacy data starts.
+- **Compare rows** are every category (and uncategorized) with a row in this month, the previous
+  three months or the same month last year, ordered by category `sortOrder`, uncategorized last.
+  Amounts are in each kind's direction, as M1 documented; uncategorized counts like spending.
+- `from` after `to` on `reports/monthly` is 400 `validation_error`.
+
+### Web
+
+- **Pages.** Dashboard (`/`) and Trends (`/trends`, a new nav item) live in `pages/reports`. Their
+  state (month, owner, grouping, span) is in the URL. Without parameters they open on the month
+  before today's (the most recent complete month) and the active profile; the owner switch lists
+  the owners by name plus All, instead of PLAN.md's "Me / Wife".
+- **Drill-down** links go to `/transactions` with `category` (id or `none`), the month's first and
+  last day, the owner (omitted for All) and `excluded=false`, so the list matches the figure.
+  Transactions has no major-category filter, so in major-category mode table rows and chart bars
+  are not links; the page says to switch to Categories. Adding a group filter would be a contract
+  change.
+- **Charts.** The dashboard breakdown is a horizontal bar chart (long names stay readable at
+  390 px). Trends has a stacked monthly bar chart and a line chart whose lines are chosen with
+  checkboxes (the three largest by default). Chart values stay in integer cents; only axis labels
+  are rounded for display. Bar colours use Recharts' `shape` prop, since `Cell` is deprecated.
+- **Lazy charts.** The three chart components load with `React.lazy` behind a "Loading chart" fallback,
+  so Recharts is in its own chunk and the main bundle stays near its pre-M8 size, while the pages
+  (controls, totals, table) render at once. Lazy routes were tried first, but a lazy index route
+  holds back the whole app shell until its chunk arrives.
+- The phone bottom bar now sizes its columns to the number of nav items (`grid-flow-col
+auto-cols-fr`) instead of a fixed 7, to fit Trends.
+- The comparison table hides the last-year, average and vs-average columns below the `md`
+  breakpoint.
