@@ -12,7 +12,8 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M4 Import flow                       | Done, awaiting H2 |
 | M5 Transaction list and editing      | Done              |
 | ML Legacy spreadsheet import         | Done, awaiting H2 |
-| M6 to M10                            | Not started       |
+| M6 Categories and rules              | Done              |
+| M7 to M10                            | Not started       |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -449,3 +450,76 @@ owners)` with exceljs. Enforces every rule of the PLAN.md format specification, 
 - H2: once the real workbook conforms, expect 13 month sheets, 799 rows, zero violations, and
   compare each month's sheet total with the workbook.
 - The web bundle is 548 kB (Vite warns above 500 kB); lazy routes can wait until M8.
+
+## M6: Categories and rules (2026-11-21, branch `m6-categories-rules`)
+
+### Built
+
+- `packages/core/src/rules.ts`: `matchRule(transaction, rules)` and `createRuleMatcher(rules)`
+  (first enabled rule by priority, then id; case-insensitive `contains`, `starts_with`,
+  `equals`, `regex`; account and direction limits; never throws), `ruleMatches` for one draft,
+  and `rulePatternError` for save-time validation.
+- Server:
+  - `services/rule-engine.ts`: `databaseRuleEngine` (enabled rules whose category is not
+    archived) is now the default `ruleEngine` of `createApp`, so import preview shows and commit
+    records rule categories, `category_source = rule` and the rule's owner.
+  - `routes/rules.ts`, `services/rules.ts`: `GET`, `POST /rules`, `PATCH`, `DELETE /rules/:id`,
+    `POST /rules/test` (match count and the ten newest matches of an unsaved rule),
+    `POST /rules/apply` (uncategorized and rule-categorized rows only; returns how many changed).
+  - `routes/categories.ts`, `services/categories.ts`: `POST /categories`,
+    `PATCH /categories/:id` (rename, kind, color, group, order, archive, restore),
+    `DELETE /categories/:id[?reassignTo=]` (archive, moving transactions and rules first).
+- Web:
+  - **Categories** page (`pages/categories`): new category form (name, major category with
+    suggestions, kind, color), Edit, up and down reorder, Archive with an optional "Move its
+    transactions and rules to" picker, an Archived section with Restore.
+  - **Rules** page (`pages/rules`): rules in priority order with their condition, category and
+    limits; New rule and Edit forms with a live match preview (count and up to ten samples, the
+    server's error for an invalid regex); Enabled checkbox; up and down reorder; Delete with
+    confirmation; **Apply rules now** with the number changed.
+  - Query hooks in `api/queries.ts`; `lib/reorder.ts` and `lib/use-debounced-value.ts`.
+
+### Acceptance
+
+- Unit tests for every `match_type`, case-insensitivity, the account and direction limits,
+  priority order, disabled rules, and an invalid regex never thrown at match time:
+  `packages/core/src/rules.test.ts` (27 tests). The invalid regex rejected with 400 at save:
+  `apps/server/src/routes/rules.test.ts` ("rejects an invalid regex with 400 at save", and the
+  PATCH and `rules/test` cases).
+- `rules/apply` never changes a transaction whose `category_source` is `manual`:
+  `rules.test.ts` ("never changes a transaction whose category_source is manual", which also
+  covers `suggestion`).
+- Archiving with `reassignTo` moves its transactions; without it they keep the archived
+  category: `apps/server/src/routes/categories.test.ts` ("with reassignTo, moves its
+  transactions and rules first", "without reassignTo, archives and the transactions keep the
+  archived category").
+- Playwright: create "description contains COSTCO sets Groceries", see the preview count (5),
+  apply, and see the matching rows categorized (through the API and on the Transactions page):
+  `e2e/rules.spec.ts`, desktop and 390 px.
+- Import wiring: `rules.test.ts` ("preview shows the category a rule would assign, and commit
+  records it", "ignores disabled rules and rules whose category is archived").
+- Web component tests: `pages/categories/categories.test.tsx`, `pages/rules/rules.test.tsx`,
+  `pages/rules/rule-draft.test.ts`, `lib/reorder.test.ts`.
+- `pnpm check:all` passes: 639 Vitest tests, 23 Playwright tests (1 skipped, as before).
+
+### Deviations
+
+- No contract change, no new dependency.
+- The real rule engine is the app's default, so one M4 test now expects the seeded card-payment
+  rule to categorize the September fixture's card payment (`imports.test.ts`).
+- Reordering uses `PATCH` on `sortOrder` and `priority` (two calls per move) instead of a
+  reorder route, which the contract does not have.
+- `rules/apply` leaves rule-categorized rows that no longer match any rule as they are.
+- Shared files touched beyond the milestone's area: `apps/server/src/app.ts` and
+  `apps/web/src/routes.tsx` (route lines), `apps/web/src/api/queries.ts` (new hooks),
+  `packages/core/src/index.ts` (one export), `apps/server/src/routes/imports.test.ts` (above),
+  `apps/server/src/db/test-rows.ts` (a new test helper for inserting transactions).
+- Details in DECISIONS.md under M6.
+
+### Follow-ups
+
+- M7: the "Always categorize WAL-MART as Groceries?" prompt can call `POST /rules/test` for the
+  count, then `POST /rules` and `POST /rules/apply`; the Rules form's `RulePreview` is reusable.
+- M7: `rules/apply` returns only a count; if the prompt needs to say which rows changed, that is a
+  contract change.
+- M8: reports should treat archived categories like any other (they keep their history).

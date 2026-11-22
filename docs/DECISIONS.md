@@ -409,3 +409,66 @@ The web app never imports it (the `@funance/core` root import is already forbidd
 - `account=none` on `GET /transactions` and "None" in the transaction list and its account
   filter came with M5, merged before ML. After merging main, the Playwright journey opens
   **Transactions** with **Account: None** and finds the legacy rows there.
+
+## 2026-11-21 · M6
+
+No contract change and no new dependency.
+
+### Rule engine
+
+- `packages/core/src/rules.ts`: `createRuleMatcher(rules)` compiles once and returns the first
+  enabled rule that matches a row; `matchRule(row, rules)` is the one-off form. Order is priority,
+  then id. `ruleMatches(rule, row)` tests one rule whatever its `enabled` flag (for
+  `rules/test`). `rulePatternError(matchType, pattern)` is what the server uses to answer 400.
+- Matching is case-insensitive: `contains`, `starts_with` and `equals` compare lower-cased text
+  literally (a `*` is a plain character); `regex` compiles with the `i` flag. A null `memo` or
+  `bank_category` never matches, even a regex such as `^$`.
+- `direction: outflow` needs a negative amount and `inflow` a positive one, so a zero amount
+  matches neither. A rule limited to an account never matches a legacy row (no account).
+- An invalid regex is rejected with 400 `invalid_pattern` at create, update (checked against the
+  whole edited rule, so switching a rule's type to regex validates its existing pattern) and
+  `rules/test`. If one ever reached the database, the matcher skips it instead of throwing.
+
+### Server
+
+- `databaseRuleEngine` is now `createApp`'s default `ruleEngine`, so import preview and commit
+  use the saved rules in production and in tests; `noopRuleEngine` stays for tests that want it.
+  One M4 test (`imports.test.ts`, "inserts the new rows...") now expects the fixture's one
+  card-payment row to be categorized by the seeded "Credit Card Payment" rule.
+- Active rules are the enabled ones whose category is not archived; only they run at import
+  and on apply.
+- `POST /rules/apply` runs over rows whose `category_source` is null or `rule`. A row changes
+  when its first matching rule sets a different category or is a different rule; it then gets
+  that category, `category_source = rule`, the rule id, and the rule's owner if it sets one. Rows
+  no rule matches are left as they are (a disabled or deleted rule does not uncategorize them).
+  The owner is changed only together with the category, so re-applying does not undo an owner
+  edited by hand on a row whose category did not change.
+- `POST /rules/test` counts every transaction the draft matches, whatever its category source
+  or the draft's `enabled` flag, and returns the ten newest (date, then id). Only the pattern is
+  validated; the category is not used.
+- `DELETE /rules/:id` sets `rule_id` to null on the transactions it categorized; they keep their
+  category and `category_source = rule`, so a later apply can recategorize them.
+- Rule create and update answer 400 `invalid_reference` for an unknown category, account or
+  owner, and 400 `archived_category` when an enabled rule (or a changed `setCategoryId`) would
+  assign an archived category.
+- Category names are unique ignoring case (409 `conflict`). A new category without `sortOrder`
+  goes after the last.
+- Archiving (`DELETE /categories/:id`, or `PATCH` with `archived: true`):
+  - with `reassignTo`: the category's transactions move to the target (their source and rule are
+    kept) and its rules are pointed at the target. 400 when the target is itself, unknown or
+    archived.
+  - without it: transactions keep the archived category and the rules that set it are disabled,
+    since an archived category cannot be newly assigned.
+  - `PATCH` with `archived: false` restores the category; its rules stay disabled until enabled.
+
+### Web
+
+- Reorder is up and down buttons. A move swaps the `sortOrder` (or `priority`) of the two
+  neighbours with two `PATCH` calls, so no reorder route was needed; tied values step one past
+  the neighbour (`lib/reorder.ts`).
+- New rules get priority one step (10) after the last rule.
+- The rule form's live preview calls `rules/test` 300 ms after the last change. Until a category
+  is chosen it sends the first active category, which `rules/test` does not use.
+- The Playwright journey limits its COSTCO rule to the account it imported into, because both
+  browser projects share one database and an unlimited rule would also match the other
+  project's rows and change the preview count.
