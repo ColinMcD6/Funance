@@ -20,10 +20,13 @@ export type TestRow = {
   ownerId?: number;
   date?: string;
   memo?: string | null;
+  /** Defaults to the description uppercased. */
+  merchantKey?: string;
   bankCategory?: string | null;
   categoryId?: number | null;
   categorySource?: CategorySource | null;
   ruleId?: number | null;
+  excluded?: boolean;
 };
 
 let dedupCounter = 0;
@@ -71,13 +74,13 @@ export function insertTestRows(db: Db, rows: readonly TestRow[]): number[] {
         amountCents: row.amountCents ?? -1000,
         description: row.description,
         memo: row.memo ?? null,
-        merchantKey: row.description.toUpperCase(),
+        merchantKey: row.merchantKey ?? row.description.toUpperCase(),
         bankCategory: row.bankCategory ?? null,
         externalId: null,
         dedupKey: `test-${dedupCounter}`,
         occurrence: 1,
         notes: null,
-        excluded: false,
+        excluded: row.excluded ?? false,
         rawRow: {},
         createdAt: EARLIER,
         updatedAt: EARLIER,

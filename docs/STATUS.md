@@ -13,7 +13,7 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M5 Transaction list and editing      | Done              |
 | ML Legacy spreadsheet import         | Done, awaiting H2 |
 | M6 Categories and rules              | Done              |
-| M7 Uncategorized queue               | Not started       |
+| M7 Uncategorized queue               | Done              |
 | M8 Reports and dashboard             | Done, awaiting H3 |
 | M9, M10                              | Not started       |
 
@@ -622,3 +622,70 @@ Built before M7, which it does not depend on.
   603 kB (warning above 500 kB, as before M8).
 - The M8 PLAN.md review step (a second agent session reviewing the report maths) is for you to
   start.
+
+## M7: Uncategorized queue and suggestions (2026-11-21, branch `m7-uncategorized`)
+
+### Built
+
+- `packages/core/src/suggestions.ts`: `mostFrequentCategory` and `suggestCategory` (merchant key
+  history first, then the bank category pairing, else null; ties to the most recent, then the
+  lower id).
+- Server: `listTransactions` returns `suggestedCategoryId` on every item when `category=none`,
+  from two grouped queries over categorized rows with a non-archived category
+  (`services/transactions.ts`).
+- Web (`pages/uncategorized`): the **Uncategorized** page replaces its placeholder. It lists
+  uncategorized, not-excluded rows oldest first, grouped by merchant key, with the count. Each row
+  has its suggestion as a one-tap button, a category picker and an owner select. A group of
+  several rows has "Accept X for all N" (when they share a suggestion) and "Set all to". A manual
+  choice opens the "Always categorize CANADIAN TIRE as Home?" prompt, which has an editable
+  pattern and a live match count, and creates and applies the rule. Keyboard shortcuts: J/K or
+  arrows, A/Enter, G, C. Rows leave the queue as soon as they are categorized (optimistic edit).
+- A count badge on the Uncategorized nav item, in the sidebar and the phone bottom bar
+  (`components/uncategorized-badge.tsx`, `useUncategorizedCount`), hidden at zero.
+
+### Acceptance
+
+- A merchant with history returns its most frequent category; one with none falls back to the
+  bank category pairing; neither gives null: `apps/server/src/routes/suggestions.test.ts`
+  ("suggests the most frequent category among rows with the same merchant key", "falls back to
+  the category most often paired with the bank category", "gives null when neither the merchant
+  nor the bank category has history"). Also covered: tie-breaking, archived categories never
+  suggested, suggestions on later pages, none outside `category=none`; unit tests in
+  `packages/core/src/suggestions.test.ts`.
+- Accepting a suggestion records `category_source = suggestion`: `suggestions.test.ts`
+  ("records category_source = suggestion", single and bulk), and the page sends it:
+  `apps/web/src/pages/uncategorized/uncategorized.test.tsx` ("accepting a suggestion records it
+  as a suggestion...", "accepts a whole merchant group in one bulk request").
+- Playwright (`e2e/uncategorized.spec.ts`, desktop and 390 px): imports the Tangerine Mastercard
+  fixture, gives eight merchants one hand-categorized row of history, and then clears the whole
+  queue of 31: one manual pick (Trailhead, prompt declined), one created rule (Canadian Tire, 4
+  matches, 3 more categorized), G on the keyboard, and the suggestion buttons for the rest. The
+  badge goes 31 → 26 → gone, the page says nothing is left, and the API shows 10 manual, 4 rule
+  and 26 suggestion rows. The spec also checks for no horizontal scroll.
+- Web tests: grouping, counts, badge, accept, group accept, manual pick and rule creation,
+  editable pattern and "Not now", group "Set all to", owner change, keyboard navigation and focus,
+  empty queue (`uncategorized.test.tsx`); `queue.test.ts` for grouping, the rule pattern and the
+  key mapping.
+- `pnpm check:all` passes: 755 Vitest tests, 29 Playwright tests (1 skipped, as before).
+
+### Deviations
+
+- No contract change, no new dependency. Choices are recorded in DECISIONS.md under M7.
+- The queue leaves out excluded rows, matching the Dashboard's uncategorized warning.
+- The Playwright spec runs on its own server and fresh database rather than the shared e2e
+  server, so it ignores `E2E_BASE_URL` (DECISIONS.md, M7).
+- Shared files touched beyond the milestone's area: `apps/web/src/routes.tsx` (the placeholder
+  line), `components/nav-items.ts` (optional `badge` field, set on Uncategorized),
+  `components/app-shell.tsx` (renders the badge), `api/queries.ts` (one hook),
+  `packages/core/src/index.ts` (one export), `apps/server/src/db/test-rows.ts` (optional
+  `merchantKey` and `excluded` for test rows).
+
+### Follow-ups
+
+- The import result page's "Categorize new transactions" link already points at `/uncategorized`.
+- M10: the full journey can use the queue; it shows up to 500 rows at a time, which may need
+  paging if a first real import leaves more.
+- The rule prompt always offers "description contains". A `merchant_key` match field would fit
+  better but is a contract change.
+- On phones, the first row shows as active even though there is no keyboard; harmless, could be
+  hidden below `md` in the M10 pass.
