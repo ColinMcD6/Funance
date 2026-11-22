@@ -335,3 +335,24 @@ export function useCompareReport(query: CompareReportQuery) {
     placeholderData: keepPreviousData,
   });
 }
+
+// ---- Uncategorized queue (M7) ----
+
+/** The rows the queue and its badge count: uncategorized and not excluded, as on the Dashboard. */
+const UNCATEGORIZED_COUNT_QUERY: TransactionQuery = {
+  category: 'none',
+  excluded: false,
+  sort: 'date',
+  order: 'asc',
+  page: 1,
+  pageSize: 1,
+};
+
+/** How many transactions wait in the Uncategorized queue; refetched after every edit. */
+export function useUncategorizedCount() {
+  return useQuery({
+    queryKey: queryKeys.transactionList(UNCATEGORIZED_COUNT_QUERY),
+    queryFn: () => listTransactions(UNCATEGORIZED_COUNT_QUERY),
+    select: (data) => data.total,
+  });
+}

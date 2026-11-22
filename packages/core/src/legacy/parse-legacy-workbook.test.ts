@@ -377,3 +377,27 @@ describe('parseLegacyWorkbook: error rows', () => {
     expect(bytes).toEqual(copy);
   });
 });
+
+describe('parseLegacyWorkbook: the bytes it is given', () => {
+  // Small Node Buffers (readFileSync, Buffer.from) are views into a shared pool, and
+  // Buffer#slice does not copy, so the parser must read exactly the view and nothing around it.
+  // Reading the whole pool made exceljs find another file's zip directory now and then.
+  it('reads only the bytes of a Buffer view inside a larger memory block', async () => {
+    const wanted = await workbook({ name: '09-2025' });
+    const other = await workbook({ name: '10-2025', rows: [GOOD.with(0, utc(2025, 10, 1))] });
+    const block = new Uint8Array(7 + wanted.length + other.length);
+    block.set(wanted, 7);
+    block.set(other, 7 + wanted.length);
+    const before = block.slice();
+
+    for (const view of [
+      Buffer.from(block.buffer, 7, wanted.length),
+      block.subarray(7, 7 + wanted.length),
+    ]) {
+      const result = await parse(view);
+      expect(result.violations).toEqual([]);
+      expect(result.monthTotals.map((m) => m.month)).toEqual(['2025-09']);
+    }
+    expect(block).toEqual(before);
+  });
+});

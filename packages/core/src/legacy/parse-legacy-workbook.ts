@@ -340,8 +340,10 @@ export async function parseLegacyWorkbook(
 ): Promise<LegacyWorkbook> {
   const workbook = new ExcelJS.Workbook();
   try {
-    // exceljs accepts an ArrayBuffer; copying keeps the caller's bytes untouched.
-    await workbook.xlsx.load(bytes.slice().buffer);
+    // exceljs takes an ArrayBuffer. `new Uint8Array(bytes)` copies exactly the view's bytes:
+    // `bytes` may be a Node Buffer inside a shared pool, whose `slice()` does not copy and whose
+    // `.buffer` holds other data. The copy also keeps the caller's bytes untouched.
+    await workbook.xlsx.load(new Uint8Array(bytes).buffer);
   } catch {
     return {
       rows: [],

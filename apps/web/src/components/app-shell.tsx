@@ -33,6 +33,7 @@ export function AppShell() {
                 >
                   <item.icon className="size-4" aria-hidden />
                   {item.label}
+                  {item.badge !== undefined && <item.badge compact={false} />}
                 </NavLink>
               </li>
             ))}
@@ -60,7 +61,10 @@ export function AppShell() {
                   )
                 }
               >
-                <item.icon className="size-5" aria-hidden />
+                <span className="relative">
+                  <item.icon className="size-5" aria-hidden />
+                  {item.badge !== undefined && <item.badge compact />}
+                </span>
                 <span className="w-full truncate text-center">{item.shortLabel}</span>
               </NavLink>
             </li>
