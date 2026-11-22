@@ -26,7 +26,8 @@ FROM node:26-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=8080 \
     HOST=0.0.0.0 \
-    DATABASE_PATH=/data/finance.sqlite
+    DATABASE_PATH=/data/finance.sqlite \
+    BACKUP_DIR=/backups
 WORKDIR /app
 COPY --from=build /out/node_modules apps/server/node_modules
 COPY --from=build /app/apps/server/package.json apps/server/package.json

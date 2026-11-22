@@ -23,6 +23,7 @@ import {
   applyRules,
   archiveCategory,
   bulkUpdateTransactions,
+  createBackup,
   commitImport,
   createAccount,
   createCategory,
@@ -334,4 +335,9 @@ export function useCompareReport(query: CompareReportQuery) {
     queryFn: () => getCompareReport(query),
     placeholderData: keepPreviousData,
   });
+}
+
+/** POST /backup: takes a backup now. */
+export function useCreateBackup() {
+  return useMutation({ mutationFn: createBackup });
 }

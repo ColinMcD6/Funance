@@ -175,3 +175,42 @@ describe('Settings', () => {
     expect(await screen.findByText('No account with id 77.')).toBeInTheDocument();
   });
 });
+
+describe('Settings backups', () => {
+  it('takes a backup now and offers the newest for download', async () => {
+    const calls = api({
+      'POST /api/backup': () => ({
+        status: 201,
+        body: {
+          filename: 'finance-20261120-120000.sqlite',
+          createdAt: '2026-11-20T12:00:00.000Z',
+          sizeBytes: 204800,
+        },
+      }),
+    });
+    const user = userEvent.setup();
+    renderAt('/settings');
+    const download = await screen.findByRole('link', { name: 'Download latest backup' });
+    expect(download).toHaveAttribute('href', '/api/backup/latest');
+    expect(download).toHaveAttribute('download');
+
+    await user.click(screen.getByRole('button', { name: 'Back up now' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Saved finance-20261120-120000.sqlite (200 KB).',
+    );
+    expect(calls).toContainEqual({ method: 'POST', path: '/api/backup', body: undefined });
+  });
+
+  it('shows why a backup failed', async () => {
+    api({
+      'POST /api/backup': () => ({
+        status: 409,
+        body: { error: { code: 'backups_disabled', message: 'Backups are not configured' } },
+      }),
+    });
+    const user = userEvent.setup();
+    renderAt('/settings');
+    await user.click(await screen.findByRole('button', { name: 'Back up now' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Backups are not configured');
+  });
+});

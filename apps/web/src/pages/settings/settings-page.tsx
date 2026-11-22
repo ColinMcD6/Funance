@@ -1,8 +1,9 @@
 import { AccountList } from './account-list';
+import { BackupSection } from './backup-section';
 import { LegacyImportSection } from './legacy-import-section';
 import { OwnerNames } from './owner-names';
 
-/** Settings: owner names and accounts. Later milestones add sections here. */
+/** Settings: owner names, accounts, the legacy import and backups. */
 export function SettingsPage() {
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -10,6 +11,7 @@ export function SettingsPage() {
       <OwnerNames />
       <AccountList />
       <LegacyImportSection />
+      <BackupSection />
     </div>
   );
 }

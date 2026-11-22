@@ -1,5 +1,8 @@
 import type { TransactionQuery } from '@funance/shared';
+import { SlidersHorizontal } from 'lucide-react';
+import { useState } from 'react';
 import { FormField } from '@/components/form-field';
+import { cn } from '@/lib/utils';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +24,20 @@ const EXCLUDED_OPTIONS = [
   { value: 'true', label: 'Excluded only' },
 ] as const;
 
+/** How many of the filters that fold away on phones are in use. */
+function foldedFilterCount(query: TransactionQuery): number {
+  return [
+    query.owner,
+    query.account,
+    query.category,
+    query.from,
+    query.to,
+    query.excluded,
+    query.minCents,
+    query.maxCents,
+  ].filter((value) => value !== undefined).length;
+}
+
 /**
  * Owner, account, category, date range, amount range and search. Selects and dates apply at
  * once; the search and amount fields apply on Enter or with the Apply button.
@@ -28,14 +45,40 @@ const EXCLUDED_OPTIONS = [
 export function FilterBar({ query, lookups, onChange, onClear }: Props) {
   const idOrNone = (value: string) =>
     value === '' ? undefined : value === 'none' ? ('none' as const) : Number(value);
+  const folded = foldedFilterCount(query);
+  // On phones the filters other than search and sort start folded, unless one is in use
+  // (for example after a drill-down from the dashboard), so the list shows on the first screen.
+  const [expanded, setExpanded] = useState(folded > 0);
   return (
     <section aria-label="Filters" className="flex flex-col gap-3">
       <SearchForm
         key={`${query.q ?? ''}|${String(query.minCents)}|${String(query.maxCents)}`}
         query={query}
         onChange={onChange}
+        expanded={expanded}
       />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="sm:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-expanded={expanded}
+          aria-controls="transaction-filters"
+          onClick={() => {
+            setExpanded(!expanded);
+          }}
+        >
+          <SlidersHorizontal aria-hidden />
+          {expanded ? 'Hide filters' : folded > 0 ? `Filters (${String(folded)})` : 'Filters'}
+        </Button>
+      </div>
+      <div
+        id="transaction-filters"
+        className={cn(
+          'grid-cols-2 gap-3 sm:grid sm:grid-cols-3 lg:grid-cols-6',
+          expanded ? 'grid' : 'hidden',
+        )}
+      >
         <FormField label="Owner">
           {(id) => (
             <NativeSelect

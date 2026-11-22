@@ -530,3 +530,67 @@ No contract change: the report routes use the shapes M1 defined in `packages/sha
 auto-cols-fr`) instead of a fixed 7, to fit Trends.
 - The comparison table hides the last-year, average and vs-average columns below the `md`
   breakpoint.
+
+## 2026-11-22 · M10
+
+No contract change and no new dependency. `POST /backup` and `GET /backup/latest` use the
+`backupResponseSchema` M1 defined.
+
+### Backups
+
+- **Service** (`apps/server/src/services/backup.ts`). `VACUUM INTO` writes a consistent snapshot
+  of the open connection to `.<name>.partial`, which is then renamed to
+  `finance-YYYYMMDD-HHMMSS.sqlite`, so the folder never holds a half-written file. The name is
+  the UTC time to the second (the container runs in UTC); a second backup in the same second
+  replaces the first. Retention keeps the newest 30 files matching that pattern, by name, and
+  never touches other files in the folder.
+- **When.** At every server start (in `index.ts`, after migrations) and after every import commit,
+  CSV and legacy (in `routes/imports.ts`). A failed backup is logged and never fails the start or
+  the commit, which has already succeeded.
+- **Folder.** `BACKUP_DIR`, default `backups` relative to the working directory; `/backups` in the
+  Dockerfile and `compose.yaml`; a temporary folder in the Playwright run. `createApp` takes an
+  optional `backups` service: without one (most integration tests), commits take no backup and
+  the backup routes answer 409 `backups_disabled`. `makeTestApp` takes `backupDir` to switch it on.
+- **Routes.** `POST /backup` returns 201 with `{ filename, createdAt, sizeBytes }`; no profile is
+  required, as it records no actor. `GET /backup/latest` sends the newest file as an attachment
+  (`application/vnd.sqlite3`), or 404 when there is none.
+- **Settings** has a Backups section: **Back up now** (shows the file name and size) and a
+  **Download latest backup** link.
+
+### Restore
+
+- `apps/server/src/restore-cli.ts`, bundled as `dist/restore.js` beside the server, replaces the
+  database at `DATABASE_PATH` with a backup file. It first checks the file (SQLite integrity
+  check, and a `transactions` table) and refuses anything else without changing the database.
+  It copies the source aside, saves the current database as a new backup (so a restore can be
+  undone; done after the copy because that backup's retention may delete the source), removes
+  the old database with its `-wal` and `-shm` files, and moves the copy into place. Migrations run
+  at the next start, so an older backup is brought up to date.
+- `scripts/restore.cmd` and `.sh` stop the container, run that command in a one-off container
+  of the same service (`docker compose run --rm --no-deps`) with the backup's folder mounted
+  read-only at `/restore`, so it writes into the `finance_data` volume as the `node` user, then
+  call the start script. On failure they start the app again unchanged.
+
+### Scripts
+
+- `scripts/start` runs `docker compose up -d --build`, waits up to 2 minutes for `/api/health`,
+  and prints `localhost`, each LAN IPv4 address and `<computer-name>.local`. The Windows script
+  uses PowerShell for the health wait and for `Get-NetIPAddress`, leaving out loopback,
+  link-local and the virtual `vEthernet`/WSL adapters. It creates `backups` first so Docker does
+  not create it as root on Linux hosts. `scripts/stop` runs `docker compose down`.
+- `.cmd` files are CRLF (`.gitattributes` already said so); `.sh` files are LF and executable.
+
+### Responsive pass (390 px)
+
+- Every page was screenshotted at 390 px on demo data; none overflowed horizontally. The two
+  problems found were usability, not overflow:
+  - **Bottom bar.** Eight items left about 48 px each and truncated "Categories". The phone bar
+    (`components/phone-nav.tsx`) now shows Home, Activity, Queue, Import, Trends and **More**;
+    More opens a list of Rules, Categories and Settings above the bar. `NavItem` gains an optional
+    `more` flag; the desktop sidebar is unchanged. M9's Budgets should set `more: true`.
+  - **Transaction filters** filled the first screen. Below the `sm` breakpoint, search, Apply and
+    Sort stay visible and the other filters (owner, account, category, dates, show, amount range)
+    fold behind a **Filters** button that shows how many are in use. They start open when any is
+    in use, for example after a dashboard drill-down.
+- The e2e overflow check now covers every page; `e2e/nav.ts` has helpers to reach pages under
+  More and to open the folded filters, used by the specs that need them.

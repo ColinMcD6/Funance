@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openFromNav, showTransactionFilters } from './nav';
 
 const LEGACY = resolve(import.meta.dirname, '../fixtures/legacy');
 const SEPTEMBER = resolve(import.meta.dirname, '../fixtures/csv/tangerine-chequing-2026-09.csv');
@@ -33,11 +34,7 @@ test('upload the legacy workbook in Settings, commit, find its rows under Accoun
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'one committed legacy import at a time');
   await chooseProfile(page, 'Colin');
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .filter({ visible: true })
-    .getByRole('link', { name: 'Settings' })
-    .click();
+  await openFromNav(page, 'Settings');
   await page.getByRole('link', { name: 'Import legacy spreadsheet' }).click();
   await expect(page.getByRole('heading', { name: 'Import legacy spreadsheet' })).toBeVisible();
 
@@ -66,6 +63,7 @@ test('upload the legacy workbook in Settings, commit, find its rows under Accoun
     .getByRole('link', { name: 'Transactions' })
     .click();
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
+  await showTransactionFilters(page);
   await page.getByLabel('Account', { exact: true }).selectOption({ label: 'None (legacy)' });
   await expect(page).toHaveURL(/[?&]account=none(&|$)/);
   await expect(page.getByTestId('range')).toHaveText('1–50 of 60');
@@ -97,14 +95,18 @@ test('a workbook breaking the format lists each problem and cannot be committed'
   page,
 }) => {
   await chooseProfile(page, 'Emily');
-  await page.goto('/settings/legacy-import');
-  await page
-    .getByLabel('Workbook', { exact: true })
-    .setInputFiles(resolve(LEGACY, 'legacy-invalid.xlsx'));
-  await page.getByRole('button', { name: 'Preview' }).click();
-  await expect(
-    page.getByRole('heading', { name: '20 problems to fix in the workbook' }),
-  ).toBeVisible();
+  // The test above holds the one committed legacy import while it runs (on another worker),
+  // and the server refuses any legacy preview until it is undone. Upload again until it is.
+  await expect(async () => {
+    await page.goto('/settings/legacy-import');
+    await page
+      .getByLabel('Workbook', { exact: true })
+      .setInputFiles(resolve(LEGACY, 'legacy-invalid.xlsx'));
+    await page.getByRole('button', { name: 'Preview' }).click();
+    await expect(
+      page.getByRole('heading', { name: '20 problems to fix in the workbook' }),
+    ).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 60_000 });
   await expect(page.getByTestId('violation').first()).toContainText('Sheet Categories');
   await expect(page.getByRole('button', { name: /^Commit / })).toBeDisabled();
 

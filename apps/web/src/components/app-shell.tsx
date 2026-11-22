@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from './nav-items';
+import { PhoneNav } from './phone-nav';
 import { ProfileSwitcher } from './profile/profile-switcher';
 
 function linkClass(isActive: boolean): string {
@@ -12,7 +13,7 @@ function linkClass(isActive: boolean): string {
 
 /**
  * The layout around every page: a header with the profile switcher, a sidebar on desktop,
- * and a fixed bottom bar on phones (below the `md` breakpoint).
+ * and a fixed bottom bar with a More menu on phones (below the `md` breakpoint).
  */
 export function AppShell() {
   return (
@@ -42,31 +43,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      <nav
-        aria-label="Main"
-        className="bg-background fixed inset-x-0 bottom-0 z-10 border-t md:hidden"
-      >
-        <ul className="grid grid-flow-col auto-cols-fr">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.to} className="min-w-0">
-              <NavLink
-                to={item.to}
-                end={item.to === '/'}
-                aria-label={item.label}
-                className={({ isActive }) =>
-                  cn(
-                    'flex flex-col items-center gap-0.5 px-0.5 py-2 text-[10px] leading-tight',
-                    isActive ? 'text-primary font-semibold' : 'text-muted-foreground',
-                  )
-                }
-              >
-                <item.icon className="size-5" aria-hidden />
-                <span className="w-full truncate text-center">{item.shortLabel}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <PhoneNav />
     </div>
   );
 }

@@ -271,6 +271,38 @@ describe('Transactions list', () => {
     });
   });
 
+  it('folds the filters on phones until opened, showing how many are in use', async () => {
+    api();
+    const user = userEvent.setup();
+    renderAt('/transactions');
+    await rows();
+    const toggle = screen.getByRole('button', { name: 'Filters' });
+    const panel = document.getElementById('transaction-filters');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Hidden below the sm breakpoint only; wider screens always show the panel.
+    expect(panel).toHaveClass('hidden', 'sm:grid');
+    expect(screen.getByLabelText('Min amount').closest('.hidden')).not.toBeNull();
+    await user.click(toggle);
+    expect(screen.getByRole('button', { name: 'Hide filters' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(panel).not.toHaveClass('hidden');
+    expect(screen.getByLabelText('Min amount').closest('.hidden')).toBeNull();
+  });
+
+  it('starts with the filters open when some are in use', async () => {
+    api();
+    renderAt('/transactions?owner=2&from=2026-10-01&to=2026-10-31');
+    await rows();
+    expect(screen.getByRole('button', { name: 'Hide filters' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Hide filters' }));
+    expect(screen.getByRole('button', { name: 'Filters (3)' })).toBeInTheDocument();
+  });
+
   it('says when no transaction matches', async () => {
     api({}, { items: [], total: 0 });
     renderAt('/transactions?q=nothing');

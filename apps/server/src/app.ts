@@ -16,6 +16,8 @@ import { categoryRoutes } from './routes/categories.js';
 import { ruleRoutes } from './routes/rules.js';
 import { reportRoutes } from './routes/reports.js';
 import { databaseRuleEngine, type RuleEngine } from './services/rule-engine.js';
+import { backupRoutes } from './routes/backup.js';
+import type { BackupService } from './services/backup.js';
 
 export type AppOptions = {
   version: string;
@@ -25,13 +27,15 @@ export type AppOptions = {
   clock?: Clock;
   /** Categorizes imported rows; defaults to the database's rules. */
   ruleEngine?: RuleEngine;
+  /** Takes backups (POST /backup and after each import commit); when absent, backups are off. */
+  backups?: BackupService;
   /** Directory holding the built web app; when absent, only the API is served. */
   staticDir?: string;
 };
 
 /** Builds the Hono app. Tests call `app.request()` on it without opening a port. */
 export function createApp(options: AppOptions): Hono {
-  const { db, clock = systemClock, ruleEngine = databaseRuleEngine } = options;
+  const { db, clock = systemClock, ruleEngine = databaseRuleEngine, backups } = options;
   const app = new Hono();
   const api = new Hono();
 
@@ -43,11 +47,12 @@ export function createApp(options: AppOptions): Hono {
   api.route('/session', sessionRoutes(db));
   api.route('/accounts', accountRoutes(db, clock));
   api.route('/csv-presets', csvPresetRoutes());
-  api.route('/imports', importRoutes(db, clock, ruleEngine));
+  api.route('/imports', importRoutes(db, clock, ruleEngine, backups));
   api.route('/transactions', transactionRoutes(db, clock));
   api.route('/categories', categoryRoutes(db, clock));
   api.route('/rules', ruleRoutes(db, clock));
   api.route('/reports', reportRoutes(db));
+  api.route('/backup', backupRoutes(backups));
 
   app.route('/api', api);
 

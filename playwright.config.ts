@@ -7,6 +7,8 @@ const PORT = 8090;
 // Set E2E_BASE_URL (e.g. http://localhost:8080) to test an already running app,
 // such as the Docker container, instead of starting the built server.
 const externalBaseUrl = process.env.E2E_BASE_URL;
+// The database and its backups for one run of the built server.
+const e2eDir = mkdtempSync(join(tmpdir(), 'funance-e2e-'));
 
 export default defineConfig({
   testDir: './e2e',
@@ -34,7 +36,8 @@ export default defineConfig({
           env: {
             PORT: String(PORT),
             HOST: '127.0.0.1',
-            DATABASE_PATH: join(mkdtempSync(join(tmpdir(), 'funance-e2e-')), 'e2e.sqlite'),
+            DATABASE_PATH: join(e2eDir, 'e2e.sqlite'),
+            BACKUP_DIR: join(e2eDir, 'backups'),
           },
         }
       : undefined,

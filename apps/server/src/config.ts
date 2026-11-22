@@ -5,6 +5,8 @@ export type ServerConfig = {
   host: string;
   databasePath: string;
   staticDir: string;
+  /** Folder for backup snapshots (`/backups` in the container). */
+  backupDir: string;
 };
 
 /** Where the built web app lives, relative to this file in both `src/` (dev) and `dist/` (build). */
@@ -22,5 +24,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     host: env.HOST ?? '0.0.0.0',
     databasePath: resolve(env.DATABASE_PATH ?? 'data/finance.sqlite'),
     staticDir: resolve(env.STATIC_DIR ?? DEFAULT_STATIC_DIR),
+    backupDir: resolve(env.BACKUP_DIR ?? 'backups'),
   };
 }

@@ -8,11 +8,13 @@ services:
     environment:
       PORT: '8080'
       DATABASE_PATH: /data/finance.sqlite
+      BACKUP_DIR: /backups
     volumes:
       # Live database: a named volume, because SQLite locking is unreliable on
       # Docker Desktop's shared host folders (PLAN.md section 4).
       - finance_data:/data
-      # Finished backup snapshots only (written from M10 on).
+      # Finished backup snapshots only: one at every start and after every import commit,
+      # newest 30 kept. scripts/restore copies one back into the volume.
       - ./backups:/backups
 
 volumes:

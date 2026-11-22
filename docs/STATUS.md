@@ -3,19 +3,20 @@
 Milestone log. Every session appends an entry: what was built, deviations, follow-ups.
 Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISIONS.md).
 
-| Milestone                            | State             |
-| ------------------------------------ | ----------------- |
-| M0 Scaffold and tooling              | Done              |
-| M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
-| M2 CSV engine                        | Done              |
-| M3 App shell, profiles, accounts     | Done              |
-| M4 Import flow                       | Done, awaiting H2 |
-| M5 Transaction list and editing      | Done              |
-| ML Legacy spreadsheet import         | Done, awaiting H2 |
-| M6 Categories and rules              | Done              |
-| M7 Uncategorized queue               | Not started       |
-| M8 Reports and dashboard             | Done, awaiting H3 |
-| M9, M10                              | Not started       |
+| Milestone                             | State             |
+| ------------------------------------- | ----------------- |
+| M0 Scaffold and tooling               | Done              |
+| M1 Contracts, schema, seed, fixtures  | Done, awaiting H1 |
+| M2 CSV engine                         | Done              |
+| M3 App shell, profiles, accounts      | Done              |
+| M4 Import flow                        | Done, awaiting H2 |
+| M5 Transaction list and editing       | Done              |
+| ML Legacy spreadsheet import          | Done, awaiting H2 |
+| M6 Categories and rules               | Done              |
+| M7 Uncategorized queue                | Not started       |
+| M8 Reports and dashboard              | Done, awaiting H3 |
+| M9 Budgets                            | Not started       |
+| M10 Backups, scripts, mobile, journey | Done, awaiting H4 |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -622,3 +623,72 @@ Built before M7, which it does not depend on.
   603 kB (warning above 500 kB, as before M8).
 - The M8 PLAN.md review step (a second agent session reviewing the report maths) is for you to
   start.
+
+## M10: Backups, scripts, mobile pass, full journey (2026-11-22, branch `worktree-m10`)
+
+Built before M7 and M9. Details of every choice are in DECISIONS.md under M10.
+
+### Built
+
+- **Backups.** `services/backup.ts` (`VACUUM INTO` snapshot, atomic rename, retention of 30),
+  `routes/backup.ts` (`POST /backup`, `GET /backup/latest`), a backup at every server start and
+  after every import commit, `BACKUP_DIR` in config, the Dockerfile, `compose.yaml` and the
+  Playwright server. Settings has a Backups section with **Back up now** and **Download latest
+  backup**.
+- **Restore.** `restore-cli.ts` (bundled as `dist/restore.js`) checks the backup, saves the
+  current database as a backup, and swaps the file in.
+- **Scripts.** `scripts/start`, `stop` and `restore`, as `.cmd` (Windows) and `.sh` (macOS).
+- **Responsive pass.** Every page checked at 390 px. Phone bottom bar reduced to five pages plus
+  a More menu; transaction filters fold behind a Filters button on phones.
+- **README** rewritten as the household guide: first-time setup, firewall, start and stop, the
+  monthly routine, backups and restore, troubleshooting.
+- **Full journey** (`e2e/journey.spec.ts`), desktop and phone: choose a profile, import a
+  statement through the Import page, categorize every row on Transactions (the card payment
+  arrives categorized by the seeded rule), review the dashboard with the owner switch against
+  hand-worked totals, drill into a category, back up and download the backup.
+
+### Acceptance
+
+- A backup opens as a valid SQLite database with the same row counts:
+  `routes/backup.test.ts` "writes a valid SQLite database with the same row counts".
+- Retention deletes the oldest beyond 30: `routes/backup.test.ts` "keeps the newest 30 and
+  deletes the oldest beyond that".
+- Scripted restore test: `services/restore.test.ts` "restore command › takes a backup, adds a
+  transaction, restores, and the transaction is gone" runs the restore command as a separate
+  process. Also run by hand with `scripts\restore.cmd` against a container on a throwaway volume
+  (38 transactions imported after the backup, 0 after the restore, the replaced database saved as
+  a backup; a non-SQLite file was refused with the app restarted unchanged).
+- The full journey passes at both viewports against the Docker image: built with
+  `docker build`, run on a fresh container (`docker run -p 8091:8080`), then
+  `E2E_BASE_URL=http://localhost:8091 pnpm exec playwright test e2e/journey.spec.ts`: 2 passed.
+  It also passes in `pnpm check:all` against the built server.
+- Backup after commit: `routes/backup.test.ts` "import commit › takes a backup that already holds
+  the committed rows". Download: "GET /backup/latest › downloads the newest backup file".
+- Responsive pass: `e2e/profiles-accounts.spec.ts` "the shell has no horizontal scrolling on any
+  page" now covers all twelve pages; `components/phone-nav.test.tsx`; the two folding tests in
+  `pages/transactions/transactions.test.tsx`.
+
+### Deviations
+
+- No contract change, no new dependency.
+- The journey cannot clear the Uncategorized queue, because M7 is not built: it categorizes on
+  Transactions instead. The README's monthly routine mentions both.
+- The journey creates its account through the API (one-time setup, not part of the monthly
+  session), as the reports spec does. It expects a fresh database, like every e2e run.
+- `.sh` scripts were only syntax-checked (`sh -n`); the `.cmd` scripts were run end to end on the
+  Windows host against a scratch compose project, never against the real `finance_data` volume.
+- `e2e/legacy-import.spec.ts` "a workbook breaking the format…" was flaky before M10: it races
+  the desktop commit test, which holds the single legacy import, and then gets a 409. It now
+  retries the upload until the slot is free (up to 60 s); its assertions are unchanged.
+- Shared files touched beyond the milestone's area: `app.ts` (route line and `backups` option),
+  `routes/imports.ts` (backup after commit), `index.ts`, `config.ts`, `test-app.ts`, `build.mjs`,
+  `components/nav-items.ts` (`more` flag), `components/app-shell.tsx`, the transaction filter
+  bar and search form, `api/queries.ts` (one hook), and the e2e specs that navigate on phones.
+
+### Follow-ups
+
+- H4: open the app from a phone, run a restore, read the README.
+- M7: add the Uncategorized queue step to `e2e/journey.spec.ts` in place of categorizing on
+  Transactions.
+- M9: give the Budgets nav item `more: true`.
+- Run the `.sh` scripts once on a Mac before relying on them.

@@ -8,13 +8,16 @@ import { centsToDollarText, parseDollars } from './dollars';
 type Props = {
   query: TransactionQuery;
   onChange: (change: Partial<TransactionQuery>) => void;
+  /** Below the `sm` breakpoint the amount fields show only when the filters are expanded. */
+  expanded: boolean;
 };
 
 /**
  * Search text and the amount range, applied together on Enter or Apply. Amounts are signed
  * dollars, as stored: spending is negative, so "-100" to "-20" finds purchases of $20 to $100.
  */
-export function SearchForm({ query, onChange }: Props) {
+export function SearchForm({ query, onChange, expanded }: Props) {
+  const amountClass = expanded ? undefined : 'hidden sm:block';
   const [q, setQ] = useState(query.q ?? '');
   const [min, setMin] = useState(centsToDollarText(query.minCents));
   const [max, setMax] = useState(centsToDollarText(query.maxCents));
@@ -53,34 +56,38 @@ export function SearchForm({ query, onChange }: Props) {
             )}
           </FormField>
         </div>
-        <FormField label="Min amount">
-          {(id) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              placeholder="-100.00"
-              value={min}
-              aria-invalid={error !== null && parseDollars(min) === null}
-              onChange={(e) => {
-                setMin(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
-        <FormField label="Max amount">
-          {(id) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              placeholder="0.00"
-              value={max}
-              aria-invalid={error !== null && parseDollars(max) === null}
-              onChange={(e) => {
-                setMax(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
+        <div className={amountClass}>
+          <FormField label="Min amount">
+            {(id) => (
+              <Input
+                id={id}
+                inputMode="decimal"
+                placeholder="-100.00"
+                value={min}
+                aria-invalid={error !== null && parseDollars(min) === null}
+                onChange={(e) => {
+                  setMin(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+        </div>
+        <div className={amountClass}>
+          <FormField label="Max amount">
+            {(id) => (
+              <Input
+                id={id}
+                inputMode="decimal"
+                placeholder="0.00"
+                value={max}
+                aria-invalid={error !== null && parseDollars(max) === null}
+                onChange={(e) => {
+                  setMax(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+        </div>
         <div className="col-span-2 sm:col-span-1">
           <Button type="submit" variant="secondary">
             Apply
