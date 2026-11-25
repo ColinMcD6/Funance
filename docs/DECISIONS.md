@@ -531,6 +531,59 @@ auto-cols-fr`) instead of a fixed 7, to fit Trends.
 - The comparison table hides the last-year, average and vs-average columns below the `md`
   breakpoint.
 
+## 2026-11-21 · M7
+
+No contract change, no new dependency. `suggestedCategoryId` on `category=none` lists and
+`categorySource: 'suggestion'` on PATCH and bulk were already in the M1 contract.
+
+### Suggestions
+
+- **History** is every categorized transaction whose category is not archived, whatever its
+  source (manual, rule, suggestion, legacy) and its excluded flag. Archived categories cannot be
+  newly assigned, so they are never suggested; their rows simply do not count.
+- **Merchant key, then bank category.** The most frequent category among rows with the same
+  `merchant_key`; with none, the most frequent among rows with the same `bank_category` (exact,
+  case-sensitive, as the bank wrote it); with neither, null.
+- **Ties** go to the category used most recently (latest transaction date), then the lower id, so
+  a suggestion never depends on row order.
+- The pick is `suggestCategory` in `packages/core/src/suggestions.ts` (pure); the server runs two
+  grouped queries per page (merchant keys and bank categories on that page) and computes it only
+  when `category=none`.
+
+### Web
+
+- **The queue** is uncategorized rows that are not excluded (the Dashboard's uncategorized
+  warning counts the same rows), oldest first, in one request of up to 500 rows (the API's
+  maximum page). Beyond 500 the page says it shows the oldest 500; the rest appear as those are
+  done. Groups are ordered by their oldest row.
+- **Accepting** sends `categorySource: 'suggestion'`. A group's "Accept X for all N" appears only
+  when all its rows share one suggestion; G on the keyboard accepts, for the active row's
+  merchant, the rows that share the active row's suggestion.
+- **"Always categorize" prompt** appears after a manual choice (a row's picker or a group's
+  "Set all to"), not after accepting a suggestion. The rule is "description contains" (rules
+  cannot match `merchant_key`), with the longest run of the merchant key's leading words that
+  appears in the description, so `WAL-MART #3177 WINNIPEG MB` gives `WAL-MART`. The pattern is
+  editable; the match count comes from `POST /rules/test`. Create runs `POST /rules` (priority
+  after every existing rule) then `POST /rules/apply`, and reports the number changed. Apply runs
+  every rule, so the count can include rows another rule changed; it never touches manual rows.
+- **Keyboard:** J or ↓ next, K or ↑ previous, A or Enter accept, G accept for the merchant, C
+  focus the category picker. Keys typed in a form control, Enter on a button or link, and presses
+  with Ctrl, Alt or Meta are left to the browser. After a shortcut, focus follows the active row
+  (so it scrolls into view); when the active row leaves the queue, the row now in its place
+  becomes active.
+- **Badge.** The Uncategorized nav item shows the queue count (`GET /transactions` with
+  `category=none&excluded=false&pageSize=1`, using `total`), hidden at zero. `NavItem` gained an
+  optional `badge` component. The badge is `aria-hidden` so the link's name stays "Uncategorized";
+  the page states the count.
+
+### Tests
+
+- `e2e/uncategorized.spec.ts` starts its own server (the same `apps/server/dist` build) on a fresh
+  database for each browser project. The other specs share one database and leave uncategorized
+  rows behind, some on purpose, so "clear the whole queue and see the badge reach zero" cannot be
+  tested there. As a result this spec does not use `E2E_BASE_URL`; it always needs a local
+  `pnpm build`.
+
 ## 2026-11-22 · M9
 
 No contract change: the M1 budget schemas, table and `GET, PUT /budgets` are used as written. No new
