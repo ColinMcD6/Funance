@@ -13,9 +13,9 @@ Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISI
 | M5 Transaction list and editing       | Done              |
 | ML Legacy spreadsheet import          | Done, awaiting H2 |
 | M6 Categories and rules               | Done              |
-| M7 Uncategorized queue                | Not started       |
+| M7 Uncategorized queue                | Done              |
 | M8 Reports and dashboard              | Done, awaiting H3 |
-| M9 Budgets                            | Not started       |
+| M9 Budgets                            | Done              |
 | M10 Backups, scripts, mobile, journey | Done, awaiting H4 |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
@@ -624,9 +624,158 @@ Built before M7, which it does not depend on.
 - The M8 PLAN.md review step (a second agent session reviewing the report maths) is for you to
   start.
 
+## M7: Uncategorized queue and suggestions (2026-11-21, branch `m7-uncategorized`)
+
+### Built
+
+- `packages/core/src/suggestions.ts`: `mostFrequentCategory` and `suggestCategory` (merchant key
+  history first, then the bank category pairing, else null; ties to the most recent, then the
+  lower id).
+- Server: `listTransactions` returns `suggestedCategoryId` on every item when `category=none`,
+  from two grouped queries over categorized rows with a non-archived category
+  (`services/transactions.ts`).
+- Web (`pages/uncategorized`): the **Uncategorized** page replaces its placeholder. It lists
+  uncategorized, not-excluded rows oldest first, grouped by merchant key, with the count. Each row
+  has its suggestion as a one-tap button, a category picker and an owner select. A group of
+  several rows has "Accept X for all N" (when they share a suggestion) and "Set all to". A manual
+  choice opens the "Always categorize CANADIAN TIRE as Home?" prompt, which has an editable
+  pattern and a live match count, and creates and applies the rule. Keyboard shortcuts: J/K or
+  arrows, A/Enter, G, C. Rows leave the queue as soon as they are categorized (optimistic edit).
+- A count badge on the Uncategorized nav item, in the sidebar and the phone bottom bar
+  (`components/uncategorized-badge.tsx`, `useUncategorizedCount`), hidden at zero.
+
+### Acceptance
+
+- A merchant with history returns its most frequent category; one with none falls back to the
+  bank category pairing; neither gives null: `apps/server/src/routes/suggestions.test.ts`
+  ("suggests the most frequent category among rows with the same merchant key", "falls back to
+  the category most often paired with the bank category", "gives null when neither the merchant
+  nor the bank category has history"). Also covered: tie-breaking, archived categories never
+  suggested, suggestions on later pages, none outside `category=none`; unit tests in
+  `packages/core/src/suggestions.test.ts`.
+- Accepting a suggestion records `category_source = suggestion`: `suggestions.test.ts`
+  ("records category_source = suggestion", single and bulk), and the page sends it:
+  `apps/web/src/pages/uncategorized/uncategorized.test.tsx` ("accepting a suggestion records it
+  as a suggestion...", "accepts a whole merchant group in one bulk request").
+- Playwright (`e2e/uncategorized.spec.ts`, desktop and 390 px): imports the Tangerine Mastercard
+  fixture, gives eight merchants one hand-categorized row of history, and then clears the whole
+  queue of 31: one manual pick (Trailhead, prompt declined), one created rule (Canadian Tire, 4
+  matches, 3 more categorized), G on the keyboard, and the suggestion buttons for the rest. The
+  badge goes 31 → 26 → gone, the page says nothing is left, and the API shows 10 manual, 4 rule
+  and 26 suggestion rows. The spec also checks for no horizontal scroll.
+- Web tests: grouping, counts, badge, accept, group accept, manual pick and rule creation,
+  editable pattern and "Not now", group "Set all to", owner change, keyboard navigation and focus,
+  empty queue (`uncategorized.test.tsx`); `queue.test.ts` for grouping, the rule pattern and the
+  key mapping.
+- `pnpm check:all` passes: 756 Vitest tests, 29 Playwright tests (1 skipped, as before).
+
+### CI fix
+
+- The first CI run failed on `fixtures/expected/legacy-engine.test.ts` ("matches what the
+  generator writes"), an ML test that M7 does not touch: exceljs could not read the committed
+  `legacy-invalid.xlsx`. The cause was in `parseLegacyWorkbook`, which passed
+  `bytes.slice().buffer` to exceljs. For a Node `Buffer` (such as `readFileSync` output),
+  `slice()` does not copy and `.buffer` is the whole shared 64 KB pool, so JSZip sometimes found
+  another file's zip directory in it (about 1 load in 300 in a stress loop). It now copies
+  exactly the view's bytes (`new Uint8Array(bytes).buffer`), with 0 failures in 1,200 loads. The
+  server already copied uploads into a plain `Uint8Array`, so the running app was not affected.
+- Regression test: `packages/core/src/legacy/parse-legacy-workbook.test.ts` ("reads only the
+  bytes of a Buffer view inside a larger memory block"). It failed before the fix.
+
+### Deviations
+
+- No contract change, no new dependency. Choices are recorded in DECISIONS.md under M7.
+- The queue leaves out excluded rows, matching the Dashboard's uncategorized warning.
+- The Playwright spec runs on its own server and fresh database rather than the shared e2e
+  server, so it ignores `E2E_BASE_URL` (DECISIONS.md, M7).
+- Shared files touched beyond the milestone's area: `apps/web/src/routes.tsx` (the placeholder
+  line), `components/nav-items.ts` (optional `badge` field, set on Uncategorized),
+  `components/app-shell.tsx` (renders the badge), `api/queries.ts` (one hook),
+  `packages/core/src/index.ts` (one export), `apps/server/src/db/test-rows.ts` (optional
+  `merchantKey` and `excluded` for test rows), and the CI fix in
+  `packages/core/src/legacy/parse-legacy-workbook.ts`.
+
+### Follow-ups
+
+- The import result page's "Categorize new transactions" link already points at `/uncategorized`.
+- M10: the full journey can use the queue; it shows up to 500 rows at a time, which may need
+  paging if a first real import leaves more.
+- The rule prompt always offers "description contains". A `merchant_key` match field would fit
+  better but is a contract change.
+- On phones, the first row shows as active even though there is no keyboard; harmless, could be
+  hidden below `md` in the M10 pass.
+
+## M9: Budgets (2026-11-22, branch `m9-budgets`)
+
+### Built
+
+- `packages/core/src/budgets.ts` (new export `@funance/core/budgets`): `effectiveBudget` (latest
+  row at or before a month, per category and owner), `budgetForView` (one owner: their own budget;
+  All: the household budget, else the sum of the owners' budgets), `budgetStatus` (actual minus
+  budget, percent used) and `duplicateBudget`.
+- Server: `services/budgets.ts` and `routes/budgets.ts`. `GET /budgets` lists every row;
+  `PUT /budgets` replaces them all in one transaction, after checking categories, owners, no
+  transfer category and no duplicate category, owner and month (400 otherwise, nothing changed).
+- Web:
+  - **Settings → Budgets** (`pages/budgets`, route `/settings/budgets`, linked from a new Budgets
+    section on Settings): edit every row as a draft (category, Household or an owner, from month,
+    monthly amount), add and remove rows, save with one PUT or discard. Rows in effect this month
+    are marked. Problems (missing or negative amount, duplicate) point at their row.
+  - **Dashboard:** each row of the comparison table with a budget shows a bar and the signed
+    amount against it under the category name, e.g. `+$20.00 over of $100.00` or
+    `-$20.00 under of $50.00`. The budget follows the owner switch and the month. In major-category
+    mode a group adds up its categories' budgets within the section.
+- `pnpm seed:demo` writes five demo budgets.
+
+### Acceptance
+
+- Effective-from lookup: `packages/core/src/budgets.test.ts` ("effectiveBudget": before the first
+  row, from a row's own month, the latest row until a later one, across a year boundary) and, on
+  rows stored through the API, `apps/server/src/routes/budgets.test.ts` ("applies the latest row
+  at or before a month, per owner and for the household").
+- Household versus per-owner budgets: `budgets.test.ts` in core ("budgetForView": one owner uses
+  only their own; All uses the household budget, else the sum of the owners'; falls back to owners
+  before a household row starts), the same server test, and `pages/reports/budget-view.test.ts`.
+- The indicator shows the correct sign and amount for seeded data:
+  - Playwright `e2e/budgets.spec.ts` seeds a month through the API (own category, account and year)
+    and checks `+$10.00 over of $150.00` (All, household budget from the 2014-03 row, not the
+    2014-01 or 2015-04 ones), `+$20.00 over of $100.00` (Colin), `-$20.00 under of $50.00` (Emily),
+    none for Joint; then adds a Joint budget in Settings → Budgets and sees `-$5.00 under of $15.00`;
+    April shows the $1 household row; and at 390 px the indicator shows with no horizontal scroll.
+  - Component tests in `pages/reports/reports.test.tsx` ("Dashboard budgets": over, under, owner
+    switch, none before the budget starts, colours).
+- Also: API validation tests in `routes/budgets.test.ts`; Budgets page tests in
+  `pages/budgets/budgets.test.tsx` and `budget-draft.test.ts`; the demo seed test counts budgets.
+- `pnpm check:all` passes after merging M7: 809 Vitest tests, 30 Playwright tests (2 skipped: the legacy commit
+  journey and the budgets spec each run in the desktop project only).
+
+### Deviations
+
+- No contract change, no new dependency. Choices are in DECISIONS.md under M9.
+- The indicator sits under the category name, not in a new column as the M8 follow-up suggested,
+  so it fits a phone.
+- Two test fixes outside the milestone's area, neither changing an assertion:
+  `e2e/legacy-import.spec.ts` (the invalid-workbook test retries its preview while the other
+  legacy test holds a committed import; a race that was already there, which the new spec's
+  worker schedule exposed) and `pages/reports/reports.test.tsx` (preloads the lazy chart modules,
+  whose first import could pass the 5 s timeout under the full suite).
+- Shared files touched: `apps/server/src/app.ts` (route line), `apps/web/src/routes.tsx` (route),
+  `api/queries.ts` (two hooks), `pages/settings/settings-page.tsx` (section),
+  `pages/reports/compare-table.tsx` and `dashboard-page.tsx` (indicator),
+  `packages/core/src/index.ts` and `package.json` (exports), `db/demo-seed*.ts` (demo budgets).
+
+### Follow-ups
+
+- A budgeted category with no transactions in the month or the comparison months has no table row,
+  so its unspent budget is not shown.
+- The budgets page saves every row with one PUT; two people saving at once would overwrite each
+  other (last save wins). That is acceptable for one household; a per-row API would be a contract
+  change.
+
 ## M10: Backups, scripts, mobile pass, full journey (2026-11-22, branch `worktree-m10`)
 
-Built before M7 and M9. Details of every choice are in DECISIONS.md under M10.
+Started before M7 and M9 merged; brought up to date with them on 2026-11-24. Details of every
+choice are in DECISIONS.md under M10.
 
 ### Built
 
@@ -643,9 +792,11 @@ Built before M7 and M9. Details of every choice are in DECISIONS.md under M10.
 - **README** rewritten as the household guide: first-time setup, firewall, start and stop, the
   monthly routine, backups and restore, troubleshooting.
 - **Full journey** (`e2e/journey.spec.ts`), desktop and phone: choose a profile, import a
-  statement through the Import page, categorize every row on Transactions (the card payment
-  arrives categorized by the seeded rule), review the dashboard with the owner switch against
-  hand-worked totals, drill into a category, back up and download the backup.
+  statement through the Import page, clear its rows from the Uncategorized queue (one pick
+  creates a rule; the card payment never reaches the queue, as the seeded rule categorized it),
+  confirm on Transactions that the account has nothing uncategorized left, review the dashboard
+  with the owner switch against hand-worked totals, drill into a category, back up and download
+  the backup.
 
 ### Acceptance
 
@@ -671,24 +822,27 @@ Built before M7 and M9. Details of every choice are in DECISIONS.md under M10.
 ### Deviations
 
 - No contract change, no new dependency.
-- The journey cannot clear the Uncategorized queue, because M7 is not built: it categorizes on
-  Transactions instead. The README's monthly routine mentions both.
+- The journey clears only its own rows from the queue, not the whole queue: the e2e database is
+  shared and other specs leave uncategorized rows in it. Its merchants carry a per-project letter
+  ("JOURNEY CAFE P") so the two browser projects never share a merchant group. Clearing the
+  whole queue is covered by M7's `e2e/uncategorized.spec.ts`, which runs its own server.
 - The journey creates its account through the API (one-time setup, not part of the monthly
   session), as the reports spec does. It expects a fresh database, like every e2e run.
 - `.sh` scripts were only syntax-checked (`sh -n`); the `.cmd` scripts were run end to end on the
   Windows host against a scratch compose project, never against the real `finance_data` volume.
-- `e2e/legacy-import.spec.ts` "a workbook breaking the format…" was flaky before M10: it races
-  the desktop commit test, which holds the single legacy import, and then gets a 409. It now
-  retries the upload until the slot is free (up to 60 s); its assertions are unchanged.
+- The flaky legacy-import test ("a workbook breaking the format…") was fixed on main in the
+  meantime with the same retry this branch had; the merge keeps main's version.
+- M7's count badge moved with the phone bar into `components/phone-nav.tsx` (on the Queue item,
+  and in the More list should a badged item ever move there). M9's Budgets is a Settings
+  section, not a nav item, so the bar is unchanged by it.
 - Shared files touched beyond the milestone's area: `app.ts` (route line and `backups` option),
   `routes/imports.ts` (backup after commit), `index.ts`, `config.ts`, `test-app.ts`, `build.mjs`,
   `components/nav-items.ts` (`more` flag), `components/app-shell.tsx`, the transaction filter
-  bar and search form, `api/queries.ts` (one hook), and the e2e specs that navigate on phones.
+  bar and search form, `api/queries.ts` (one hook), `pages/settings/settings-page.tsx` (one
+  section), and the e2e specs that navigate on phones.
 
 ### Follow-ups
 
 - H4: open the app from a phone, run a restore, read the README.
-- M7: add the Uncategorized queue step to `e2e/journey.spec.ts` in place of categorizing on
-  Transactions.
-- M9: give the Budgets nav item `more: true`.
+- A future nav item that is not used every month should set `more: true`.
 - Run the `.sh` scripts once on a Mac before relying on them.

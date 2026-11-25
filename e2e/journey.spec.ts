@@ -5,7 +5,8 @@ type Owner = { id: number; name: string };
 
 /**
  * The whole monthly session in one test, at desktop and phone width: choose a profile, import
- * a statement, categorize every new row, review the month on the dashboard with the owner
+ * a statement, clear its rows from the Uncategorized queue (one pick becomes a rule), check the
+ * account has nothing uncategorized left, review the month on the dashboard with the owner
  * switch, drill into a category, and back up. All specs share one database, so each browser
  * project uses its own account and a year no other spec touches.
  *
@@ -68,8 +69,18 @@ const ROWS: {
   },
 ];
 
-function statement(year: number): string {
-  const lines = ROWS.map(
+/**
+ * The rows for one browser project. Both projects run at once against one queue, which groups
+ * rows by merchant, so each project's merchants get a letter of their own ("JOURNEY CAFE P").
+ */
+function rowsFor(tag: string): typeof ROWS {
+  return ROWS.map((r) =>
+    r.category === 'Card Payment' ? r : { ...r, description: `${r.description} ${tag}` },
+  );
+}
+
+function statement(rows: typeof ROWS, year: number): string {
+  const lines = rows.map(
     (r) => `${r.date}/${String(year)},${r.description},${r.amount},${r.owner}`,
   );
   return ['Date,Description,Amount,Owner', ...lines].join('\n') + '\n';
@@ -130,8 +141,11 @@ async function expectTotals(
 
 test('full monthly session: import, categorize, review, back up', async ({ page }, testInfo) => {
   const phone = testInfo.project.name === 'phone';
-  const year = phone ? 2014 : 2015;
+  // Years no other spec uses (reports: 2016 to 2019, budgets: 2015).
+  const year = phone ? 2012 : 2013;
   const accountName = `Journey e2e ${testInfo.project.name}`;
+  const rows = rowsFor(phone ? 'P' : 'D');
+  const cafe = rows.find((r) => r.category === 'Coffee')?.description ?? '';
 
   // 1. Choose a profile.
   await page.goto('/');
@@ -146,7 +160,7 @@ test('full monthly session: import, categorize, review, back up', async ({ page 
   await page.getByLabel('Statement file').setInputFiles({
     name: `journey-${String(year)}-03.csv`,
     mimeType: 'text/csv',
-    buffer: Buffer.from(statement(year)),
+    buffer: Buffer.from(statement(rows, year)),
   });
   await page.getByRole('button', { name: 'Preview' }).click();
   await expect(page.getByRole('heading', { name: /^Preview: / })).toBeVisible();
@@ -156,31 +170,46 @@ test('full monthly session: import, categorize, review, back up', async ({ page 
   await page.getByRole('button', { name: 'Commit 6 new transactions' }).click();
   await expect(page.getByRole('heading', { name: 'Imported 6 transactions' })).toBeVisible();
 
-  // 3. Categorize: the card payment already has its category from the seeded rule; pick the rest.
+  // 3. Clear this statement's rows from the Uncategorized queue. The queue also holds other
+  // specs' rows (the database is shared), so each row is found by its description. The card
+  // payment never reaches the queue: the seeded rule categorized it at commit.
+  await page.getByRole('link', { name: 'Categorize new transactions' }).click();
+  await expect(page.getByRole('heading', { name: 'Uncategorized', level: 1 })).toBeVisible();
+  const queue = page.getByTestId('queue-row');
+  const prompt = page.getByRole('region', { name: 'Create a rule' });
+  for (const row of rows) {
+    const inQueue = queue.filter({ hasText: row.description });
+    if (row.category === 'Card Payment') {
+      await expect(inQueue).toHaveCount(0);
+      continue;
+    }
+    await expect(inQueue).toHaveCount(1);
+    await inQueue
+      .getByRole('combobox', { name: 'Category', exact: true })
+      .selectOption({ label: row.category });
+    // A manual pick offers a rule for the merchant: create one for the utility bill, which
+    // comes every month, and decline the rest.
+    await expect(prompt.getByTestId('rule-question')).toContainText(`as ${row.category}?`);
+    if (row.category === 'Home') {
+      await prompt.getByRole('button', { name: 'Create rule' }).click();
+      await expect(page.getByTestId('queue-message')).toContainText('Created the rule');
+    } else {
+      await prompt.getByRole('button', { name: 'Not now' }).click();
+    }
+    await expect(prompt).toBeHidden();
+    await expect(inQueue).toHaveCount(0);
+  }
+  await expectNoOverflow(page, 'the Uncategorized queue');
+
+  // Nothing is left uncategorized in the account.
   await openFromNav(page, 'Transactions');
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
   await showTransactionFilters(page);
-  await page.getByLabel('Account', { exact: true }).selectOption({ label: accountName });
+  const filters = page.getByRole('region', { name: 'Filters' });
+  await filters.getByLabel('Account', { exact: true }).selectOption({ label: accountName });
   await expect(page.getByTestId('range')).toHaveText('1–6 of 6');
-  const rows = page.getByTestId(phone ? 'transaction-card' : 'transaction-row');
-  for (const row of ROWS) {
-    const category = rows.filter({ hasText: row.description }).getByRole('combobox', {
-      name: 'Category',
-    });
-    if (row.category === 'Card Payment') {
-      await expect(category.locator('option:checked')).toHaveText('Card Payment');
-      continue;
-    }
-    await category.selectOption({ label: row.category });
-    await expect(category.locator('option:checked')).toHaveText(row.category);
-  }
   await expectNoOverflow(page, 'the transaction list');
-
-  // Nothing is left uncategorized in the account.
-  await page
-    .getByRole('region', { name: 'Filters' })
-    .getByLabel('Category', { exact: true })
-    .selectOption({ label: 'Uncategorized' });
+  await filters.getByLabel('Category', { exact: true }).selectOption({ label: 'Uncategorized' });
   await expect(page.getByText('No transactions match these filters.')).toBeVisible();
 
   // 4. Review the month: the dashboard opens on the active profile.
@@ -212,7 +241,8 @@ test('full monthly session: import, categorize, review, back up', async ({ page 
     .click();
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
   await expect(page.getByTestId('range')).toHaveText('1–1 of 1');
-  await expect(rows.filter({ hasText: 'JOURNEY CAFE' })).toHaveCount(1);
+  const listed = page.getByTestId(phone ? 'transaction-card' : 'transaction-row');
+  await expect(listed.filter({ hasText: cafe })).toHaveCount(1);
 
   // 5. Back up and download the backup.
   await openFromNav(page, 'Settings');

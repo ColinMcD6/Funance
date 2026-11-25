@@ -95,17 +95,19 @@ test('a workbook breaking the format lists each problem and cannot be committed'
   page,
 }) => {
   await chooseProfile(page, 'Emily');
-  // The test above holds the one committed legacy import while it runs (on another worker),
-  // and the server refuses any legacy preview until it is undone. Upload again until it is.
+  await page.goto('/settings/legacy-import');
+  // The commit journey above may hold a committed legacy import while this runs (the tests share
+  // one database), and the server refuses a legacy preview until it is undone, which that test
+  // does at its end. So retry the preview until the server accepts it.
+  test.setTimeout(90_000);
   await expect(async () => {
-    await page.goto('/settings/legacy-import');
     await page
       .getByLabel('Workbook', { exact: true })
       .setInputFiles(resolve(LEGACY, 'legacy-invalid.xlsx'));
     await page.getByRole('button', { name: 'Preview' }).click();
     await expect(
       page.getByRole('heading', { name: '20 problems to fix in the workbook' }),
-    ).toBeVisible({ timeout: 3000 });
+    ).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 60_000 });
   await expect(page.getByTestId('violation').first()).toContainText('Sheet Categories');
   await expect(page.getByRole('button', { name: /^Commit / })).toBeDisabled();

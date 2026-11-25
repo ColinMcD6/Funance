@@ -1,6 +1,8 @@
+import type { BudgetStatus } from '@funance/core/budgets';
 import { formatCents } from '@funance/core/money';
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
+import { BudgetIndicator } from './budget-indicator';
 import type { CompareLine, CompareSection } from './report-view';
 
 const SECTION_LABELS: Record<CompareSection, string> = {
@@ -48,9 +50,12 @@ function Difference({
 export function CompareTable({
   lines,
   linkFor,
+  budgetFor = () => null,
 }: {
   lines: readonly CompareLine[];
   linkFor: (line: CompareLine) => string | null;
+  /** The line's budget status this month; null hides the budget indicator. */
+  budgetFor?: (line: CompareLine) => BudgetStatus | null;
 }) {
   if (lines.length === 0) {
     return <p className="text-muted-foreground text-sm">No transactions this month.</p>;
@@ -81,6 +86,7 @@ export function CompareTable({
             </tr>
             {inSection.map((line) => {
               const to = linkFor(line);
+              const budget = budgetFor(line);
               return (
                 <tr key={line.key} className="border-b text-right" data-testid="compare-row">
                   <td className="py-2 text-left">
@@ -98,6 +104,12 @@ export function CompareTable({
                         </Link>
                       )}
                     </span>
+                    {budget !== null && (
+                      // Below the name, so the indicator fits a phone without another column.
+                      <span className="mt-1 block pl-4.5">
+                        <BudgetIndicator status={budget} section={section} />
+                      </span>
+                    )}
                   </td>
                   <td className="py-2 pl-2">
                     <Money cents={line.thisMonthCents} />

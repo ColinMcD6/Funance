@@ -34,6 +34,7 @@ export function AppShell() {
                 >
                   <item.icon className="size-4" aria-hidden />
                   {item.label}
+                  {item.badge !== undefined && <item.badge compact={false} />}
                 </NavLink>
               </li>
             ))}

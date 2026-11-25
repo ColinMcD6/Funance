@@ -1,19 +1,31 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mockApi } from '@/test-utils/mock-api';
 import { PhoneNav } from './phone-nav';
 
 function renderAt(path: string) {
+  // The Uncategorized item carries a count badge, read from the API.
+  mockApi({
+    'GET /api/transactions': () => ({ body: { items: [], total: 4 } }),
+  });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter([{ path: '*', element: <PhoneNav /> }], {
     initialEntries: [path],
   });
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('PhoneNav', () => {
@@ -30,6 +42,12 @@ describe('PhoneNav', () => {
       'false',
     );
     expect(within(nav).queryByRole('link', { name: 'Settings' })).toBeNull();
+  });
+
+  it('keeps the uncategorized count on the Queue item', async () => {
+    renderAt('/');
+    const queue = screen.getByRole('link', { name: 'Uncategorized' });
+    expect(await within(queue).findByTestId('uncategorized-badge')).toHaveTextContent('4');
   });
 
   it('opens More, lists the other pages, and closes after choosing one', async () => {

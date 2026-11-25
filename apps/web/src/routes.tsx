@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router';
+import { BudgetsPage } from '@/pages/budgets/budgets-page';
 import { CategoriesPage } from '@/pages/categories/categories-page';
 import { ImportHistoryPage } from '@/pages/import/import-history-page';
 import { ImportPage } from '@/pages/import/import-page';
@@ -11,12 +12,13 @@ import { LegacyImportPage } from '@/pages/settings/legacy-import-page';
 import { RulesPage } from '@/pages/rules/rules-page';
 import { SettingsPage } from '@/pages/settings/settings-page';
 import { TransactionsPage } from '@/pages/transactions/transactions-page';
+import { UncategorizedPage } from '@/pages/uncategorized/uncategorized-page';
 
 /** Pages inside the app shell. Append-only: one line per page; later milestones replace placeholders. */
 export const PAGE_ROUTES: RouteObject[] = [
   { index: true, element: <DashboardPage /> },
   { path: 'transactions', element: <TransactionsPage /> },
-  { path: 'uncategorized', element: <PlaceholderPage title="Uncategorized" milestone="M7" /> },
+  { path: 'uncategorized', element: <UncategorizedPage /> },
   { path: 'import', element: <ImportPage /> },
   { path: 'rules', element: <RulesPage /> },
   { path: 'categories', element: <CategoriesPage /> },
@@ -27,5 +29,6 @@ export const PAGE_ROUTES: RouteObject[] = [
   { path: 'import/:id', element: <ImportResultPage /> },
   { path: 'settings/legacy-import', element: <LegacyImportPage /> },
   { path: 'trends', element: <TrendsPage /> },
+  { path: 'settings/budgets', element: <BudgetsPage /> },
   { path: '*', element: <PlaceholderPage title="Page not found" milestone="no milestone" /> },
 ];

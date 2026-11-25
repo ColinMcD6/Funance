@@ -15,6 +15,7 @@ import { transactionRoutes } from './routes/transactions.js';
 import { categoryRoutes } from './routes/categories.js';
 import { ruleRoutes } from './routes/rules.js';
 import { reportRoutes } from './routes/reports.js';
+import { budgetRoutes } from './routes/budgets.js';
 import { databaseRuleEngine, type RuleEngine } from './services/rule-engine.js';
 import { backupRoutes } from './routes/backup.js';
 import type { BackupService } from './services/backup.js';
@@ -52,6 +53,7 @@ export function createApp(options: AppOptions): Hono {
   api.route('/categories', categoryRoutes(db, clock));
   api.route('/rules', ruleRoutes(db, clock));
   api.route('/reports', reportRoutes(db));
+  api.route('/budgets', budgetRoutes(db));
   api.route('/backup', backupRoutes(backups));
 
   app.route('/api', api);

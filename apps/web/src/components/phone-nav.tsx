@@ -49,6 +49,7 @@ export function PhoneNav() {
               >
                 <item.icon className="size-5" aria-hidden />
                 {item.label}
+                {item.badge !== undefined && <item.badge compact={false} />}
               </NavLink>
             </li>
           ))}
@@ -64,7 +65,10 @@ export function PhoneNav() {
               onClick={close}
               className={({ isActive }) => itemClass(isActive)}
             >
-              <item.icon className="size-5" aria-hidden />
+              <span className="relative">
+                <item.icon className="size-5" aria-hidden />
+                {item.badge !== undefined && <item.badge compact />}
+              </span>
               <span className="w-full truncate text-center">{item.shortLabel}</span>
             </NavLink>
           </li>

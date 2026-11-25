@@ -2,6 +2,7 @@ import type {
   CommitImportRequest,
   CompareReportQuery,
   MonthlyReportQuery,
+  PutBudgetsRequest,
   CreateAccountRequest,
   CreateCategoryRequest,
   RuleInput,
@@ -30,6 +31,8 @@ import {
   createRule,
   deleteRule,
   getCompareReport,
+  listBudgets,
+  putBudgets,
   getMonthlyReport,
   getImport,
   getHealth,
@@ -67,6 +70,7 @@ export const queryKeys = {
   transactionList: (query: TransactionQuery) => ['transactions', query] as const,
   monthlyReport: (query: MonthlyReportQuery) => ['reports', 'monthly', query] as const,
   compareReport: (query: CompareReportQuery) => ['reports', 'compare', query] as const,
+  budgets: ['budgets'],
 } as const;
 
 export function useHealth() {
@@ -336,6 +340,46 @@ export function useCompareReport(query: CompareReportQuery) {
     placeholderData: keepPreviousData,
   });
 }
+
+// ---- Budgets (M9) ----
+
+export function useBudgets() {
+  return useQuery({ queryKey: queryKeys.budgets, queryFn: listBudgets });
+}
+
+/** PUT /budgets replaces every row; the cache takes the saved list from the response. */
+export function usePutBudgets() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (budgets: PutBudgetsRequest['budgets']) => putBudgets(budgets),
+    onSuccess: (saved) => {
+      client.setQueryData(queryKeys.budgets, saved);
+    },
+  });
+}
+
+// ---- Uncategorized queue (M7) ----
+
+/** The rows the queue and its badge count: uncategorized and not excluded, as on the Dashboard. */
+const UNCATEGORIZED_COUNT_QUERY: TransactionQuery = {
+  category: 'none',
+  excluded: false,
+  sort: 'date',
+  order: 'asc',
+  page: 1,
+  pageSize: 1,
+};
+
+/** How many transactions wait in the Uncategorized queue; refetched after every edit. */
+export function useUncategorizedCount() {
+  return useQuery({
+    queryKey: queryKeys.transactionList(UNCATEGORIZED_COUNT_QUERY),
+    queryFn: () => listTransactions(UNCATEGORIZED_COUNT_QUERY),
+    select: (data) => data.total,
+  });
+}
+
+// ---- Backups (M10) ----
 
 /** POST /backup: takes a backup now. */
 export function useCreateBackup() {

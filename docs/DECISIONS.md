@@ -531,6 +531,111 @@ auto-cols-fr`) instead of a fixed 7, to fit Trends.
 - The comparison table hides the last-year, average and vs-average columns below the `md`
   breakpoint.
 
+## 2026-11-21 · M7
+
+No contract change, no new dependency. `suggestedCategoryId` on `category=none` lists and
+`categorySource: 'suggestion'` on PATCH and bulk were already in the M1 contract.
+
+### Suggestions
+
+- **History** is every categorized transaction whose category is not archived, whatever its
+  source (manual, rule, suggestion, legacy) and its excluded flag. Archived categories cannot be
+  newly assigned, so they are never suggested; their rows simply do not count.
+- **Merchant key, then bank category.** The most frequent category among rows with the same
+  `merchant_key`; with none, the most frequent among rows with the same `bank_category` (exact,
+  case-sensitive, as the bank wrote it); with neither, null.
+- **Ties** go to the category used most recently (latest transaction date), then the lower id, so
+  a suggestion never depends on row order.
+- The pick is `suggestCategory` in `packages/core/src/suggestions.ts` (pure); the server runs two
+  grouped queries per page (merchant keys and bank categories on that page) and computes it only
+  when `category=none`.
+
+### Web
+
+- **The queue** is uncategorized rows that are not excluded (the Dashboard's uncategorized
+  warning counts the same rows), oldest first, in one request of up to 500 rows (the API's
+  maximum page). Beyond 500 the page says it shows the oldest 500; the rest appear as those are
+  done. Groups are ordered by their oldest row.
+- **Accepting** sends `categorySource: 'suggestion'`. A group's "Accept X for all N" appears only
+  when all its rows share one suggestion; G on the keyboard accepts, for the active row's
+  merchant, the rows that share the active row's suggestion.
+- **"Always categorize" prompt** appears after a manual choice (a row's picker or a group's
+  "Set all to"), not after accepting a suggestion. The rule is "description contains" (rules
+  cannot match `merchant_key`), with the longest run of the merchant key's leading words that
+  appears in the description, so `WAL-MART #3177 WINNIPEG MB` gives `WAL-MART`. The pattern is
+  editable; the match count comes from `POST /rules/test`. Create runs `POST /rules` (priority
+  after every existing rule) then `POST /rules/apply`, and reports the number changed. Apply runs
+  every rule, so the count can include rows another rule changed; it never touches manual rows.
+- **Keyboard:** J or ↓ next, K or ↑ previous, A or Enter accept, G accept for the merchant, C
+  focus the category picker. Keys typed in a form control, Enter on a button or link, and presses
+  with Ctrl, Alt or Meta are left to the browser. After a shortcut, focus follows the active row
+  (so it scrolls into view); when the active row leaves the queue, the row now in its place
+  becomes active.
+- **Badge.** The Uncategorized nav item shows the queue count (`GET /transactions` with
+  `category=none&excluded=false&pageSize=1`, using `total`), hidden at zero. `NavItem` gained an
+  optional `badge` component. The badge is `aria-hidden` so the link's name stays "Uncategorized";
+  the page states the count.
+
+### Tests
+
+- `e2e/uncategorized.spec.ts` starts its own server (the same `apps/server/dist` build) on a fresh
+  database for each browser project. The other specs share one database and leave uncategorized
+  rows behind, some on purpose, so "clear the whole queue and see the badge reach zero" cannot be
+  tested there. As a result this spec does not use `E2E_BASE_URL`; it always needs a local
+  `pnpm build`.
+
+## 2026-11-22 · M9
+
+No contract change: the M1 budget schemas, table and `GET, PUT /budgets` are used as written. No new
+dependency.
+
+### Budget semantics chosen where the contract left room
+
+- **Effective-from lookup** (`packages/core/src/budgets.ts`, `effectiveBudget`): for a category and
+  an owner (null = household), the row with the latest `effectiveFrom` at or before the month. Rows
+  are matched exactly by owner; a household row and an owner row never stand in for each other.
+- **Household versus per-owner** (`budgetForView`): one owner's view uses only that owner's budget
+  (a household budget says nothing about how it is shared). The All view uses the household budget
+  when one is in effect; otherwise it adds up the owners' budgets in effect, so per-owner budgets
+  alone still give a household figure.
+- **Sign.** The indicator shows actual minus budget: `+$20.00 over` when above the budget,
+  `-$20.00 under` below it. Over is red for spending and green for income and saved; any
+  non-transfer category can have a budget, as a target for income and saved.
+- **Major categories.** A major-category line adds up the budgets of its categories in the same
+  section, so a mixed group (Money) compares spending with spending budgets only.
+- **PUT /budgets validation** (400, nothing changed): unknown category or owner
+  (`invalid_reference`); a transfer category, or two rows with the same category, owner and
+  effective month (`validation_error`, the duplicate's indexes in `details`). Archived categories
+  are accepted so their rows survive a round trip. The response lists rows by category id,
+  household first, then owner id, then month.
+
+### Web
+
+- **Settings → Budgets** (`/settings/budgets`, linked from a Budgets section on Settings, no nav
+  item): every row is a draft (category, for: Household or an owner, from month, amount) with Add,
+  Remove, Save and Discard. Save sends one PUT with every row, as the contract's replace-all shape
+  requires. Changing a budget from a later month is a new row, so history stays. Rows in effect this
+  month are marked. Transfers are not offered; archived categories only on rows that already have
+  them.
+- **Dashboard.** The indicator (a bar and the signed amount, "of $budget") sits under the category
+  name in the comparison table rather than in a new column, so it shows on a phone too.
+- A budgeted category with no transactions in the month, the three before or the same month last
+  year has no comparison row, so no indicator. Showing it would mean inventing comparison figures.
+
+### Demo data and tests
+
+- `pnpm seed:demo` also writes five budgets (Groceries raised from June 2026, Eating out, per-owner
+  Coffee) so the dashboard shows indicators.
+- The Playwright budgets spec runs in the desktop project only and checks 390 px by resizing:
+  `PUT /budgets` replaces every row, so two projects saving at once on the shared database could
+  undo each other.
+- `e2e/legacy-import.spec.ts`: the invalid-workbook test now retries its preview while the commit
+  journey holds a committed legacy import (the server refuses a second until it is undone). The race
+  was already there; adding a spec changed the worker schedule and made it fail every run. No
+  assertion changed.
+- `pages/reports/reports.test.tsx` preloads the lazy chart modules in `beforeAll`. Under the full
+  parallel suite, the first Recharts import alone could pass the 5 s test timeout.
+
 ## 2026-11-22 · M10
 
 No contract change and no new dependency. `POST /backup` and `GET /backup/latest` use the
@@ -587,7 +692,7 @@ No contract change and no new dependency. `POST /backup` and `GET /backup/latest
   - **Bottom bar.** Eight items left about 48 px each and truncated "Categories". The phone bar
     (`components/phone-nav.tsx`) now shows Home, Activity, Queue, Import, Trends and **More**;
     More opens a list of Rules, Categories and Settings above the bar. `NavItem` gains an optional
-    `more` flag; the desktop sidebar is unchanged. M9's Budgets should set `more: true`.
+    `more` flag; the desktop sidebar is unchanged. M7's count badge stays on the Queue item.
   - **Transaction filters** filled the first screen. Below the `sm` breakpoint, search, Apply and
     Sort stay visible and the other filters (owner, account, category, dates, show, amount range)
     fold behind a **Filters** button that shows how many are in use. They start open when any is

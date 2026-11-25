@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, type RouteObject } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '@/app';
 import { mockApi, OWNERS } from '@/test-utils/mock-api';
 
@@ -81,8 +81,16 @@ function api() {
       body: { rows: MONTHLY[lastQuery('monthly').owner ?? 'all'] ?? [] },
     }),
     'GET /api/reports/compare': () => ({ body: COMPARE }),
+    'GET /api/budgets': () => ({ body: BUDGETS }),
   });
 }
+
+/** Groceries: $150 for the household, $50 for Emily. Income: a $4,000 household target. */
+const BUDGETS = [
+  { id: 1, categoryId: 1, ownerId: null, monthlyAmountCents: 15000, effectiveFrom: '2026-01' },
+  { id: 2, categoryId: 1, ownerId: 2, monthlyAmountCents: 5000, effectiveFrom: '2026-01' },
+  { id: 3, categoryId: 4, ownerId: null, monthlyAmountCents: 400000, effectiveFrom: '2026-01' },
+];
 
 function queries(report: 'monthly' | 'compare'): Record<string, string>[] {
   return vi
@@ -105,6 +113,16 @@ function renderAt(path: string) {
     />,
   );
 }
+
+// The charts are lazy chunks; loading Recharts the first time can take seconds when the whole
+// suite runs in parallel. Load them once here, so no single test pays for it within its timeout.
+beforeAll(async () => {
+  await Promise.all([
+    import('./breakdown-chart'),
+    import('./trend-stack-chart'),
+    import('./trend-line-chart'),
+  ]);
+}, 60_000);
 
 beforeEach(() => {
   document.cookie = 'profile=1; path=/';
@@ -232,5 +250,88 @@ describe('Trends', () => {
     expect(screen.queryByRole('checkbox', { name: 'Income' })).not.toBeInTheDocument();
     await user.click(groceries);
     expect(groceries).not.toBeChecked();
+  });
+});
+
+describe('Dashboard budgets', () => {
+  function rowOf(table: HTMLElement, name: string): HTMLElement {
+    const row = within(table).getByRole('link', { name }).closest('tr');
+    if (row === null) throw new Error(`no row for ${name}`);
+    return row;
+  }
+
+  it('shows over budget with a plus sign and the amount, against the owner’s budget', async () => {
+    api();
+    const user = userEvent.setup();
+    renderAt('/?month=2026-10&owner=all');
+    const table = await screen.findByTestId('compare-table');
+    // All: the household Groceries budget, $185 spent against $150.
+    await waitFor(() => {
+      expect(within(rowOf(table, 'Groceries')).getByTestId('budget-indicator')).toHaveTextContent(
+        '+$35.00 over of $150.00',
+      );
+    });
+    expect(within(rowOf(table, 'Groceries')).getByTestId('budget-difference')).toHaveClass(
+      'text-destructive',
+    );
+    // Income above its target is over too, and shown as good.
+    const income = within(rowOf(table, 'Income')).getByTestId('budget-difference');
+    expect(income).toHaveTextContent('+$1,000.00 over');
+    expect(income).toHaveClass('text-green-700');
+    expect(within(rowOf(table, 'Uncategorized')).queryByTestId('budget-indicator')).toBeNull();
+
+    // Emily: her own $50 Groceries budget, not the household one.
+    await user.click(screen.getByRole('button', { name: 'Emily' }));
+    await waitFor(() => {
+      expect(within(rowOf(table, 'Groceries')).getByTestId('budget-indicator')).toHaveTextContent(
+        '+$135.00 over of $50.00',
+      );
+    });
+    // Emily has no Income budget of her own.
+    expect(within(rowOf(table, 'Income')).queryByTestId('budget-indicator')).toBeNull();
+  });
+
+  it('shows under budget with a minus sign, and nothing before the budget starts', async () => {
+    mockApi({
+      'GET /api/health': () => ({ body: { status: 'ok', version: '0.1.0' } }),
+      'GET /api/owners': () => ({ body: OWNERS }),
+      'GET /api/categories': () => ({ body: CATEGORIES }),
+      'GET /api/reports/monthly': () => ({ body: { rows: [] } }),
+      'GET /api/reports/compare': () => ({
+        body: {
+          month: lastQuery('compare').month,
+          rows: [
+            {
+              categoryId: 1,
+              thisMonthCents: 9550,
+              previousMonthCents: null,
+              sameMonthLastYearCents: null,
+              trailing3MonthAvgCents: null,
+            },
+          ],
+        },
+      }),
+      'GET /api/budgets': () => ({ body: BUDGETS }),
+    });
+    const user = userEvent.setup();
+    renderAt('/?month=2026-01&owner=all');
+    const table = await screen.findByTestId('compare-table');
+    // $95.50 against $150: $54.50 under.
+    await waitFor(() => {
+      expect(within(rowOf(table, 'Groceries')).getByTestId('budget-indicator')).toHaveTextContent(
+        '-$54.50 under of $150.00',
+      );
+    });
+    expect(within(rowOf(table, 'Groceries')).getByTestId('budget-difference')).toHaveClass(
+      'text-green-700',
+    );
+    // December 2025 is before every budget starts.
+    await user.click(screen.getByRole('button', { name: 'Previous month' }));
+    await waitFor(() => {
+      expect(lastQuery('compare').month).toBe('2025-12');
+    });
+    await waitFor(() => {
+      expect(within(table).queryByTestId('budget-indicator')).toBeNull();
+    });
   });
 });

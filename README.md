@@ -70,10 +70,11 @@ About 20 minutes, once a month after the statements are out.
    out, so overlapping statements are safe. If the columns look wrong, cancel and fix the
    account's mapping in **Settings**. Otherwise press **Commit**. A backup is taken after every
    commit. A mistake can be undone in **Import → Import history**.
-3. **Categorize.** Open **Uncategorized** (or **Transactions** with Category set to
-   Uncategorized) and give every new transaction a category and owner. Card payments and
-   transfers go in **Card Payment** or **Transfer**, so they drop out of the totals. For
-   merchants you see every month, add a rule in **Rules** so the next import does it for you.
+3. **Categorize.** Open **Uncategorized** (the red number on it is how many are waiting). Rows
+   are grouped by merchant; tap the suggested category to accept it for the whole group, or pick
+   one. After a pick the app offers to always categorize that merchant the same way: say yes for
+   merchants you see every month. Card payments and transfers go in **Card Payment** or
+   **Transfer**, so they drop out of the totals. You're done when the count reaches zero.
 4. **Review the month.** **Dashboard** opens on last month. Switch between Colin, Emily, Joint
    and All, compare with earlier months, and tap any category to see its transactions.
    **Trends** shows the last 12 or 24 months.

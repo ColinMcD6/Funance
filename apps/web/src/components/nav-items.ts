@@ -9,6 +9,8 @@ import {
   Upload,
   type LucideIcon,
 } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { UncategorizedBadge } from './uncategorized-badge';
 
 export type NavItem = {
   to: string;
@@ -16,6 +18,8 @@ export type NavItem = {
   /** Fits under the icon in the phone bottom bar. */
   shortLabel: string;
   icon: LucideIcon;
+  /** A count shown with the item; `compact` is the phone bottom bar. */
+  badge?: ComponentType<{ compact: boolean }>;
   /** On phones, listed under More instead of in the bottom bar, which fits about six items. */
   more?: boolean;
 };
@@ -24,7 +28,13 @@ export type NavItem = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/', label: 'Dashboard', shortLabel: 'Home', icon: LayoutDashboard },
   { to: '/transactions', label: 'Transactions', shortLabel: 'Activity', icon: ArrowUpDown },
-  { to: '/uncategorized', label: 'Uncategorized', shortLabel: 'Queue', icon: Inbox },
+  {
+    to: '/uncategorized',
+    label: 'Uncategorized',
+    shortLabel: 'Queue',
+    icon: Inbox,
+    badge: UncategorizedBadge,
+  },
   { to: '/import', label: 'Import', shortLabel: 'Import', icon: Upload },
   { to: '/rules', label: 'Rules', shortLabel: 'Rules', icon: ListChecks, more: true },
   {

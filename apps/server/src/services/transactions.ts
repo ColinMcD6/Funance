@@ -1,5 +1,6 @@
 import type {
   Transaction,
+  TransactionListItem,
   TransactionListResponse,
   TransactionPatch,
   TransactionQuery,
@@ -18,6 +19,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { suggestCategory, type CategoryTally } from '@funance/core';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Clock } from '../clock.js';
 import type { Db } from '../db/migrate.js';
@@ -67,7 +69,62 @@ function orderBy(query: TransactionQuery): SQL[] {
   return [...key[query.sort], dir(t.id)];
 }
 
-/** One page of transactions matching every filter in `query`, and the total that match. */
+/**
+ * How often each category was used per value of `column`, over categorized rows whose category
+ * is not archived (an archived category cannot be newly assigned, so it is never suggested).
+ */
+function categoryTallies(
+  db: Db,
+  column: typeof transactions.merchantKey | typeof transactions.bankCategory,
+  values: readonly string[],
+): Map<string, CategoryTally[]> {
+  const byValue = new Map<string, CategoryTally[]>();
+  if (values.length === 0) return byValue;
+  const rows = db
+    .select({
+      value: column,
+      categoryId: categories.id,
+      count: count(),
+      lastDate: sql<string>`max(${transactions.date})`,
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(categories.id, transactions.categoryId))
+    .where(and(inArray(column, [...values]), eq(categories.archived, false)))
+    .groupBy(column, categories.id)
+    .all();
+  for (const row of rows) {
+    if (row.value === null) continue;
+    const list = byValue.get(row.value) ?? [];
+    list.push({ categoryId: row.categoryId, count: row.count, lastDate: row.lastDate });
+    byValue.set(row.value, list);
+  }
+  return byValue;
+}
+
+/**
+ * Each row with its `suggestedCategoryId` (PLAN.md section 3): the merchant key's most frequent
+ * category, else the bank category's, else null. Two grouped queries cover the whole page.
+ */
+function withSuggestions(db: Db, items: readonly Transaction[]): TransactionListItem[] {
+  const merchants = categoryTallies(db, transactions.merchantKey, [
+    ...new Set(items.map((t) => t.merchantKey)),
+  ]);
+  const bankCategories = categoryTallies(db, transactions.bankCategory, [
+    ...new Set(items.flatMap((t) => (t.bankCategory === null ? [] : [t.bankCategory]))),
+  ]);
+  return items.map((t) => ({
+    ...t,
+    suggestedCategoryId: suggestCategory(
+      merchants.get(t.merchantKey) ?? [],
+      t.bankCategory === null ? [] : (bankCategories.get(t.bankCategory) ?? []),
+    ),
+  }));
+}
+
+/**
+ * One page of transactions matching every filter in `query`, and the total that match. With
+ * `category=none`, each item carries its `suggestedCategoryId`.
+ */
 export function listTransactions(db: Db, query: TransactionQuery): TransactionListResponse {
   const where = and(...filterConditions(query));
   const total = db.select({ n: count() }).from(transactions).where(where).get()?.n ?? 0;
@@ -79,7 +136,7 @@ export function listTransactions(db: Db, query: TransactionQuery): TransactionLi
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .all();
-  return { items, total };
+  return { items: query.category === 'none' ? withSuggestions(db, items) : items, total };
 }
 
 type ResolvedPatch = Partial<
