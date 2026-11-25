@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router';
+import { BudgetsPage } from '@/pages/budgets/budgets-page';
 import { CategoriesPage } from '@/pages/categories/categories-page';
 import { ImportHistoryPage } from '@/pages/import/import-history-page';
 import { ImportPage } from '@/pages/import/import-page';
@@ -28,5 +29,6 @@ export const PAGE_ROUTES: RouteObject[] = [
   { path: 'import/:id', element: <ImportResultPage /> },
   { path: 'settings/legacy-import', element: <LegacyImportPage /> },
   { path: 'trends', element: <TrendsPage /> },
+  { path: 'settings/budgets', element: <BudgetsPage /> },
   { path: '*', element: <PlaceholderPage title="Page not found" milestone="no milestone" /> },
 ];

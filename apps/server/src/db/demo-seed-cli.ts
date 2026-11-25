@@ -14,7 +14,8 @@ try {
   console.log(`Demo data written to ${databasePath}`);
   console.log(
     `${summary.imports} imports, ${summary.transactions} transactions ` +
-      `(${summary.categorized} categorized), net ${formatCents(summary.totalCents)}`,
+      `(${summary.categorized} categorized), net ${formatCents(summary.totalCents)}, ` +
+      `${summary.budgets} budgets`,
   );
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);

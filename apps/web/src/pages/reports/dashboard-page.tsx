@@ -1,7 +1,14 @@
 import { reportTotals } from '@funance/core/reports';
 import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router';
-import { useCategories, useCompareReport, useMonthlyReport, useOwners } from '@/api/queries';
+import {
+  useBudgets,
+  useCategories,
+  useCompareReport,
+  useMonthlyReport,
+  useOwners,
+} from '@/api/queries';
+import { lineBudget } from './budget-view';
 import { ChartLoading } from './chart-loading';
 import { CompareTable } from './compare-table';
 import { ReportControls } from './report-controls';
@@ -37,6 +44,7 @@ export function DashboardPage() {
     groupBy: view.groupBy,
   });
   const compare = useCompareReport({ month: view.month, owner: view.owner });
+  const budgets = useBudgets();
 
   const categoryList = categories.data ?? [];
   const rows = monthly.data?.rows ?? [];
@@ -51,7 +59,8 @@ export function DashboardPage() {
           owner: view.owner,
         });
 
-  const error = monthly.error ?? compare.error;
+  const error = monthly.error ?? compare.error ?? budgets.error;
+  const budgetList = budgets.data ?? [];
   const loading = monthly.isPlaceholderData || compare.isPlaceholderData;
 
   return (
@@ -101,6 +110,7 @@ export function DashboardPage() {
           <CompareTable
             lines={compareLines(compare.data.rows, categoryList, view.groupBy)}
             linkFor={linkFor}
+            budgetFor={(line) => lineBudget(line, budgetList, categoryList, view.month, view.owner)}
           />
         )}
         {view.groupBy === 'group' && (

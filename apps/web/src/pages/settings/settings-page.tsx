@@ -1,4 +1,5 @@
 import { AccountList } from './account-list';
+import { BudgetsSection } from './budgets-section';
 import { LegacyImportSection } from './legacy-import-section';
 import { OwnerNames } from './owner-names';
 
@@ -10,6 +11,7 @@ export function SettingsPage() {
       <OwnerNames />
       <AccountList />
       <LegacyImportSection />
+      <BudgetsSection />
     </div>
   );
 }
