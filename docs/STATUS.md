@@ -3,20 +3,20 @@
 Milestone log. Every session appends an entry: what was built, deviations, follow-ups.
 Plan: [PLAN.md](PLAN.md). Deviations and new dependencies: [DECISIONS.md](DECISIONS.md).
 
-| Milestone                            | State             |
-| ------------------------------------ | ----------------- |
-| M0 Scaffold and tooling              | Done              |
-| M1 Contracts, schema, seed, fixtures | Done, awaiting H1 |
-| M2 CSV engine                        | Done              |
-| M3 App shell, profiles, accounts     | Done              |
-| M4 Import flow                       | Done, awaiting H2 |
-| M5 Transaction list and editing      | Done              |
-| ML Legacy spreadsheet import         | Done, awaiting H2 |
-| M6 Categories and rules              | Done              |
-| M7 Uncategorized queue               | Done              |
-| M8 Reports and dashboard             | Done, awaiting H3 |
-| M9 Budgets                           | Done              |
-| M10                                  | Not started       |
+| Milestone                             | State             |
+| ------------------------------------- | ----------------- |
+| M0 Scaffold and tooling               | Done              |
+| M1 Contracts, schema, seed, fixtures  | Done, awaiting H1 |
+| M2 CSV engine                         | Done              |
+| M3 App shell, profiles, accounts      | Done              |
+| M4 Import flow                        | Done, awaiting H2 |
+| M5 Transaction list and editing       | Done              |
+| ML Legacy spreadsheet import          | Done, awaiting H2 |
+| M6 Categories and rules               | Done              |
+| M7 Uncategorized queue                | Done              |
+| M8 Reports and dashboard              | Done, awaiting H3 |
+| M9 Budgets                            | Done              |
+| M10 Backups, scripts, mobile, journey | Done, awaiting H4 |
 
 ## M0: Scaffold and tooling (2026-11-17, branch `m0-scaffold`)
 
@@ -771,3 +771,78 @@ Built before M7, which it does not depend on.
 - The budgets page saves every row with one PUT; two people saving at once would overwrite each
   other (last save wins). That is acceptable for one household; a per-row API would be a contract
   change.
+
+## M10: Backups, scripts, mobile pass, full journey (2026-11-22, branch `worktree-m10`)
+
+Started before M7 and M9 merged; brought up to date with them on 2026-11-24. Details of every
+choice are in DECISIONS.md under M10.
+
+### Built
+
+- **Backups.** `services/backup.ts` (`VACUUM INTO` snapshot, atomic rename, retention of 30),
+  `routes/backup.ts` (`POST /backup`, `GET /backup/latest`), a backup at every server start and
+  after every import commit, `BACKUP_DIR` in config, the Dockerfile, `compose.yaml` and the
+  Playwright server. Settings has a Backups section with **Back up now** and **Download latest
+  backup**.
+- **Restore.** `restore-cli.ts` (bundled as `dist/restore.js`) checks the backup, saves the
+  current database as a backup, and swaps the file in.
+- **Scripts.** `scripts/start`, `stop` and `restore`, as `.cmd` (Windows) and `.sh` (macOS).
+- **Responsive pass.** Every page checked at 390 px. Phone bottom bar reduced to five pages plus
+  a More menu; transaction filters fold behind a Filters button on phones.
+- **README** rewritten as the household guide: first-time setup, firewall, start and stop, the
+  monthly routine, backups and restore, troubleshooting.
+- **Full journey** (`e2e/journey.spec.ts`), desktop and phone: choose a profile, import a
+  statement through the Import page, clear its rows from the Uncategorized queue (one pick
+  creates a rule; the card payment never reaches the queue, as the seeded rule categorized it),
+  confirm on Transactions that the account has nothing uncategorized left, review the dashboard
+  with the owner switch against hand-worked totals, drill into a category, back up and download
+  the backup.
+
+### Acceptance
+
+- A backup opens as a valid SQLite database with the same row counts:
+  `routes/backup.test.ts` "writes a valid SQLite database with the same row counts".
+- Retention deletes the oldest beyond 30: `routes/backup.test.ts` "keeps the newest 30 and
+  deletes the oldest beyond that".
+- Scripted restore test: `services/restore.test.ts` "restore command › takes a backup, adds a
+  transaction, restores, and the transaction is gone" runs the restore command as a separate
+  process. Also run by hand with `scripts\restore.cmd` against a container on a throwaway volume
+  (38 transactions imported after the backup, 0 after the restore, the replaced database saved as
+  a backup; a non-SQLite file was refused with the app restarted unchanged).
+- The full journey passes at both viewports against the Docker image: built with
+  `docker build`, run on a fresh container (`docker run -p 8091:8080`), then
+  `E2E_BASE_URL=http://localhost:8091 pnpm exec playwright test e2e/journey.spec.ts`: 2 passed.
+  It also passes in `pnpm check:all` against the built server.
+- Backup after commit: `routes/backup.test.ts` "import commit › takes a backup that already holds
+  the committed rows". Download: "GET /backup/latest › downloads the newest backup file".
+- Responsive pass: `e2e/profiles-accounts.spec.ts` "the shell has no horizontal scrolling on any
+  page" now covers all twelve pages; `components/phone-nav.test.tsx`; the two folding tests in
+  `pages/transactions/transactions.test.tsx`.
+
+### Deviations
+
+- No contract change, no new dependency.
+- The journey clears only its own rows from the queue, not the whole queue: the e2e database is
+  shared and other specs leave uncategorized rows in it. Its merchants carry a per-project letter
+  ("JOURNEY CAFE P") so the two browser projects never share a merchant group. Clearing the
+  whole queue is covered by M7's `e2e/uncategorized.spec.ts`, which runs its own server.
+- The journey creates its account through the API (one-time setup, not part of the monthly
+  session), as the reports spec does. It expects a fresh database, like every e2e run.
+- `.sh` scripts were only syntax-checked (`sh -n`); the `.cmd` scripts were run end to end on the
+  Windows host against a scratch compose project, never against the real `finance_data` volume.
+- The flaky legacy-import test ("a workbook breaking the format…") was fixed on main in the
+  meantime with the same retry this branch had; the merge keeps main's version.
+- M7's count badge moved with the phone bar into `components/phone-nav.tsx` (on the Queue item,
+  and in the More list should a badged item ever move there). M9's Budgets is a Settings
+  section, not a nav item, so the bar is unchanged by it.
+- Shared files touched beyond the milestone's area: `app.ts` (route line and `backups` option),
+  `routes/imports.ts` (backup after commit), `index.ts`, `config.ts`, `test-app.ts`, `build.mjs`,
+  `components/nav-items.ts` (`more` flag), `components/app-shell.tsx`, the transaction filter
+  bar and search form, `api/queries.ts` (one hook), `pages/settings/settings-page.tsx` (one
+  section), and the e2e specs that navigate on phones.
+
+### Follow-ups
+
+- H4: open the app from a phone, run a restore, read the README.
+- A future nav item that is not used every month should set `more: true`.
+- Run the `.sh` scripts once on a Mac before relying on them.

@@ -24,6 +24,7 @@ import {
   applyRules,
   archiveCategory,
   bulkUpdateTransactions,
+  createBackup,
   commitImport,
   createAccount,
   createCategory,
@@ -376,4 +377,11 @@ export function useUncategorizedCount() {
     queryFn: () => listTransactions(UNCATEGORIZED_COUNT_QUERY),
     select: (data) => data.total,
   });
+}
+
+// ---- Backups (M10) ----
+
+/** POST /backup: takes a backup now. */
+export function useCreateBackup() {
+  return useMutation({ mutationFn: createBackup });
 }

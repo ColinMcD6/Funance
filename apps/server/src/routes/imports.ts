@@ -23,6 +23,7 @@ import {
   undoImport,
 } from '../services/imports.js';
 import { commitLegacyImport, previewLegacyImport } from '../services/legacy-imports.js';
+import type { BackupService } from '../services/backup.js';
 import type { RuleEngine } from '../services/rule-engine.js';
 
 /** Reads the multipart form of POST /imports/preview: a `file` and the text fields. */
@@ -47,7 +48,12 @@ async function readUpload(c: Context): Promise<{ file: File; fields: Record<stri
 }
 
 /** POST /imports/preview, POST /imports/legacy/preview, POST /imports/:id/commit, POST /imports/:id/undo, GET /imports(/:id). */
-export function importRoutes(db: Db, clock: Clock, ruleEngine: RuleEngine): Hono {
+export function importRoutes(
+  db: Db,
+  clock: Clock,
+  ruleEngine: RuleEngine,
+  backups?: BackupService,
+): Hono {
   const routes = new Hono();
 
   routes.get('/', (c) => c.json(importListResponseSchema.parse(listImports(db))));
@@ -95,6 +101,13 @@ export function importRoutes(db: Db, clock: Clock, ruleEngine: RuleEngine): Hono
       getImportKind(db, id) === 'legacy'
         ? await commitLegacyImport(db, clock, id, body.skipLines)
         : commitImport(db, clock, ruleEngine, id, body.skipLines);
+    // The commit has succeeded either way: a failed backup is logged, not reported as a
+    // failed commit.
+    try {
+      backups?.take();
+    } catch (err) {
+      console.error('Backup after import commit failed', err);
+    }
     return c.json(commitImportResponseSchema.parse(summary));
   });
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { openFromNav, showTransactionFilters } from './nav';
 
 const LEGACY = resolve(import.meta.dirname, '../fixtures/legacy');
 const SEPTEMBER = resolve(import.meta.dirname, '../fixtures/csv/tangerine-chequing-2026-09.csv');
@@ -33,11 +34,7 @@ test('upload the legacy workbook in Settings, commit, find its rows under Accoun
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'one committed legacy import at a time');
   await chooseProfile(page, 'Colin');
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .filter({ visible: true })
-    .getByRole('link', { name: 'Settings' })
-    .click();
+  await openFromNav(page, 'Settings');
   await page.getByRole('link', { name: 'Import legacy spreadsheet' }).click();
   await expect(page.getByRole('heading', { name: 'Import legacy spreadsheet' })).toBeVisible();
 
@@ -66,6 +63,7 @@ test('upload the legacy workbook in Settings, commit, find its rows under Accoun
     .getByRole('link', { name: 'Transactions' })
     .click();
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
+  await showTransactionFilters(page);
   await page.getByLabel('Account', { exact: true }).selectOption({ label: 'None (legacy)' });
   await expect(page).toHaveURL(/[?&]account=none(&|$)/);
   await expect(page.getByTestId('range')).toHaveText('1–50 of 60');

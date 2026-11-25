@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openFromNav } from './nav';
 
 async function chooseProfile(page: Page, name: string) {
   await page.goto('/');
@@ -30,10 +31,7 @@ test('create a Walmart account from the preset with two cardholders, and it pers
   const accountName = `Walmart e2e ${testInfo.project.name}`;
   await chooseProfile(page, 'Colin');
 
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('link', { name: 'Settings' })
-    .click();
+  await openFromNav(page, 'Settings');
   await page.getByRole('link', { name: 'Add account' }).click();
   await page.getByLabel('Preset').selectOption('walmart-mastercard');
   await page.getByLabel('Name', { exact: true }).fill(accountName);
@@ -63,7 +61,20 @@ test('create a Walmart account from the preset with two cardholders, and it pers
 
 test('the shell has no horizontal scrolling on any page', async ({ page }) => {
   await chooseProfile(page, 'Colin');
-  for (const path of ['/', '/transactions', '/settings', '/settings/accounts/new']) {
+  for (const path of [
+    '/',
+    '/transactions',
+    '/uncategorized',
+    '/import',
+    '/import/history',
+    '/rules',
+    '/categories',
+    '/settings',
+    '/settings/accounts/new',
+    '/settings/accounts/1',
+    '/settings/legacy-import',
+    '/trends',
+  ]) {
     await page.goto(path);
     await expect(page.locator('main h1')).toBeVisible();
     // A string expression: the e2e tsconfig has no DOM types.
@@ -87,9 +98,10 @@ test('every page is reachable from the visible navigation', async ({ page }) => 
     'Rules',
     'Categories',
     'Settings',
+    'Trends',
     'Dashboard',
   ]) {
-    await nav.getByRole('link', { name }).click();
+    await openFromNav(page, name);
     await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
   }
 });

@@ -9,20 +9,23 @@ describe('readConfig', () => {
     expect(config.host).toBe('0.0.0.0');
     expect(config.databasePath).toBe(resolve('data/finance.sqlite'));
     expect(config.staticDir).toBe(resolve(import.meta.dirname, '../../web/dist'));
+    expect(config.backupDir).toBe(resolve('backups'));
   });
 
-  it('reads PORT, DATABASE_PATH, HOST and STATIC_DIR', () => {
+  it('reads PORT, DATABASE_PATH, HOST, STATIC_DIR and BACKUP_DIR', () => {
     const config = readConfig({
       PORT: '9090',
       DATABASE_PATH: '/data/finance.sqlite',
       HOST: '127.0.0.1',
       STATIC_DIR: '/srv/web',
+      BACKUP_DIR: '/backups',
     });
     expect(config).toEqual({
       port: 9090,
       host: '127.0.0.1',
       databasePath: resolve('/data/finance.sqlite'),
       staticDir: resolve('/srv/web'),
+      backupDir: resolve('/backups'),
     });
   });
 
